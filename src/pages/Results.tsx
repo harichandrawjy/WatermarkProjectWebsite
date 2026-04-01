@@ -1,4 +1,5 @@
 import type { AnalysisResult, Page } from '../App'
+import { Icon } from '@iconify/react'
 
 interface ResultsProps {
   result: AnalysisResult | null
@@ -6,35 +7,45 @@ interface ResultsProps {
 }
 
 interface MetricCardProps {
-  label: string; value: string; sub?: string; danger?: boolean
+  label: string; value: string; sub?: string; danger?: boolean; highlight?: boolean
 }
 
-function MetricCard({ label, value, sub, danger }: MetricCardProps) {
+function MetricCard({ label, value, sub, danger, highlight }: MetricCardProps) {
   return (
-    <div className={`rounded-2xl p-6 border transition-transform hover:-translate-y-0.5
-      ${danger ? 'bg-danger/5 border-red-200' : 'bg-card border-border'}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted mb-2">{label}</p>
-      <p className={`font-display text-[1.8rem] font-normal leading-none mb-1.5
-        ${danger ? 'text-danger' : 'text-primary'}`}>{value}</p>
-      {sub && <p className="text-[11.5px] text-muted">{sub}</p>}
+    <div className={`rounded-3xl p-6 border transition-all duration-300 hover:-translate-y-1 relative overflow-hidden group
+      ${danger ? 'bg-rose-500/5 border-rose-500/20 hover:border-rose-500/40 hover:shadow-[0_10px_30px_-10px_rgba(244,63,94,0.15)]' : 
+        highlight ? 'bg-cyan-500/5 border-cyan-500/20 hover:border-cyan-500/40 hover:shadow-[0_10px_30px_-10px_rgba(34,211,238,0.15)]' : 
+        'bg-[#111318] border-white/5 hover:border-white/20'}`}>
+      
+      {/* Background ambient glow on hover */}
+      <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl -mr-10 -mt-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none
+        ${danger ? 'bg-rose-500/10' : highlight ? 'bg-cyan-500/10' : 'bg-white/5'}`} />
+
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 relative z-10">{label}</p>
+      <p className={`font-display text-[2rem] font-medium leading-none mb-2 relative z-10
+        ${danger ? 'text-rose-400' : highlight ? 'text-cyan-400' : 'text-white'}`}>{value}</p>
+      {sub && <p className="text-[12px] text-slate-400 relative z-10">{sub}</p>}
     </div>
   )
 }
 
 export default function Results({ result, navigate }: ResultsProps) {
+  
+  // Empty State
   if (!result) return (
-    <div className="flex flex-col items-center justify-center py-32 gap-5 px-7 text-center">
-      <div className="text-muted">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6"/>
-          <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-        </svg>
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-7 text-center relative z-10">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-cyan-500/5 rounded-full blur-[100px] pointer-events-none -z-10" />
+      
+      <div className="w-20 h-20 rounded-full bg-[#111318] border border-white/5 flex items-center justify-center text-slate-600 shadow-xl">
+        <Icon icon="lucide:file-search" width="32" strokeWidth="1.5" />
       </div>
-      <h2 className="font-display text-[2rem] font-normal">No Analysis Yet</h2>
-      <p className="text-secondary max-w-[300px]">Upload a file and run the analysis to see results here.</p>
+      <div>
+        <h2 className="font-display text-[2rem] text-white font-medium mb-2">No Analysis Yet</h2>
+        <p className="text-slate-400 max-w-[320px] mx-auto text-[15px]">Upload a watermarked file and run the detection pipeline to view the integrity report.</p>
+      </div>
       <button onClick={() => navigate('verify')}
-        className="px-6 py-3.5 bg-primary text-white rounded-xl font-medium hover:bg-[#333] transition-all">
-        Upload File →
+        className="px-8 py-4 mt-2 bg-cyan-500 text-slate-950 rounded-xl font-bold hover:bg-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all">
+        Go to Verification →
       </button>
     </div>
   )
@@ -43,146 +54,203 @@ export default function Results({ result, navigate }: ResultsProps) {
   const tampered = status === 'tampered'
 
   return (
-    <div className="max-w-[1100px] mx-auto px-7 pb-20">
+    <div className="max-w-[1100px] mx-auto px-7 pb-32 relative z-10">
+      
+      {/* Background Ambient Glows */}
+      <div className={`absolute top-[0%] right-[10%] w-[30%] h-[20%] blur-[120px] rounded-full pointer-events-none -z-10 transition-colors duration-1000 ${tampered ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`} />
 
       {/* Header */}
-      <div className="pt-12 pb-8 flex flex-wrap items-start justify-between gap-6">
+      <div className="pt-16 pb-10 flex flex-col md:flex-row items-start md:items-end justify-between gap-8 border-b border-white/5 mb-10">
         <div>
           <button onClick={() => navigate('verify')}
-            className="flex items-center gap-1 text-[13px] text-secondary hover:text-primary mb-3 transition-colors">
-            ← New Analysis
+            className="flex items-center gap-2 text-[12px] font-bold tracking-widest uppercase text-cyan-400 hover:text-cyan-300 mb-6 transition-colors group">
+            <Icon icon="lucide:arrow-left" width="14" className="group-hover:-translate-x-1 transition-transform" /> 
+            New Analysis
           </button>
-          <h1 className="font-display text-[clamp(2rem,4vw,3rem)] font-normal leading-tight mb-2">Analysis Report</h1>
-          <p className="flex items-center gap-1.5 text-[13px] text-muted">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" stroke="currentColor" strokeWidth="1.8"/><polyline points="13 2 13 9 20 9" stroke="currentColor" strokeWidth="1.8"/></svg>
+          <h1 className="font-display text-[clamp(2.5rem,4vw,3.5rem)] text-white font-semibold leading-tight mb-3 tracking-tight">Analysis Report</h1>
+          <p className="flex items-center gap-2 text-[14px] text-slate-400 font-mono bg-white/5 inline-flex px-3 py-1.5 rounded-lg border border-white/5">
+            <Icon icon="lucide:file-terminal" width="16" className="text-cyan-400" />
             {fileName}
           </p>
         </div>
 
-        {/* Verdict */}
-        <div className={`flex items-center gap-4 px-6 py-5 rounded-2xl border-[1.5px]
-          ${tampered ? 'bg-danger/5 border-red-300' : 'bg-success/5 border-green-300'}`}>
-          <div className={tampered ? 'text-danger' : 'text-success'}>
-            {tampered
-              ? <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z" stroke="currentColor" strokeWidth="1.8"/><path d="M12 9v4M12 17h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-              : <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="1.8"/><path d="m9 12 2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            }
+        {/* Verdict Badge */}
+        <div className={`flex items-center gap-5 px-8 py-6 rounded-3xl border shadow-2xl backdrop-blur-md
+          ${tampered ? 'bg-rose-500/10 border-rose-500/30 shadow-[0_10px_40px_-10px_rgba(244,63,94,0.2)]' : 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_10px_40px_-10px_rgba(16,185,129,0.2)]'}`}>
+          <div className={`w-14 h-14 rounded-full flex items-center justify-center border ${tampered ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'}`}>
+            <Icon icon={tampered ? "lucide:shield-alert" : "lucide:shield-check"} width="28" strokeWidth="2" />
           </div>
           <div>
-            <p className={`font-bold text-[1.1rem] tracking-wide ${tampered ? 'text-danger' : 'text-success'}`}>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Final Verdict</p>
+            <p className={`font-display text-[1.8rem] font-bold tracking-wide leading-none mb-1 ${tampered ? 'text-rose-400' : 'text-emerald-400'}`}>
               {tampered ? 'TAMPERED' : 'AUTHENTIC'}
             </p>
-            <p className="text-[12px] text-secondary mt-0.5">{(confidence * 100).toFixed(1)}% confidence</p>
+            <p className={`text-[13px] font-medium ${tampered ? 'text-rose-400/70' : 'text-emerald-400/70'}`}>
+              {(confidence * 100).toFixed(1)}% confidence score
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Metrics grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-        <MetricCard label="Detection Status" value={tampered ? 'Tampered' : 'Authentic'} sub="Watermark integrity check" danger={tampered} />
-        <MetricCard label="PSNR" value={`${psnr.toFixed(1)} dB`} sub="Image quality after watermarking" />
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-16">
+        <MetricCard label="Detection Status" value={tampered ? 'Tampered' : 'Authentic'} sub="Watermark integrity check" danger={tampered} highlight={!tampered} />
+        <MetricCard label="PSNR" value={`${psnr.toFixed(1)} dB`} sub="Image quality parameter" />
         <MetricCard label="WM Accuracy" value={`${(wmAccuracy * 100).toFixed(1)}%`} sub="Watermark bit recovery rate" />
-        <MetricCard label="BER" value={ber.toFixed(4)} sub="Bit error rate (lower = better)" />
-        <MetricCard label="Tampered Regions" value={String(tamperedRegions.length)} sub={tampered ? 'Areas of concern found' : 'No regions flagged'} danger={tampered && tamperedRegions.length > 0} />
-        <MetricCard label="Media Type" value={fileType === 'video' ? 'Video' : 'Image'} sub="Analyzed file format" />
+        <MetricCard label="Bit Error Rate" value={ber.toFixed(4)} sub="BER (lower = better integrity)" />
+        <MetricCard label="Regions Flagged" value={String(tamperedRegions.length)} sub={tampered ? 'Areas of concern localized' : 'No regions flagged'} danger={tampered && tamperedRegions.length > 0} />
+        <MetricCard label="Media Type" value={fileType === 'video' ? 'Video' : 'Image'} sub="Analyzed file format container" />
       </div>
 
-      {/* Tampered regions table */}
+      {/* Tampered Regions Table */}
       {tampered && tamperedRegions.length > 0 && (
-        <section className="mb-10">
-          <h2 className="font-display text-[1.5rem] font-normal mb-2">Tampered Regions</h2>
-          <p className="text-secondary text-[13px] mb-4">Spatial locations of detected manipulation</p>
-          <div className="bg-card border border-border rounded-2xl overflow-hidden">
-            <table className="w-full text-[13px] border-collapse">
-              <thead>
-                <tr className="bg-subtle border-b border-border">
-                  {['#','Label','Position (x, y)','Size (w × h)','Status'].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tamperedRegions.map((r, i) => (
-                  <tr key={i} className="border-b border-border last:border-0 hover:bg-subtle transition-colors">
-                    <td className="px-5 py-3.5">{i + 1}</td>
-                    <td className="px-5 py-3.5"><code className="font-mono text-[12px] bg-subtle px-2 py-0.5 rounded text-accent">{r.label}</code></td>
-                    <td className="px-5 py-3.5 text-secondary">({r.x}, {r.y})</td>
-                    <td className="px-5 py-3.5 text-secondary">{r.w} × {r.h} px</td>
-                    <td className="px-5 py-3.5">
-                      <span className="px-2.5 py-1 bg-danger/10 text-danger text-[11px] font-semibold rounded-full">Tampered</span>
-                    </td>
+        <section className="mb-16">
+          <div className="flex items-center gap-3 mb-6">
+            <Icon icon="lucide:focus" className="text-rose-400" width="24" />
+            <div>
+              <h2 className="text-[22px] font-medium text-white leading-none mb-1">Spatial Localization</h2>
+              <p className="text-slate-400 text-[14px]">Coordinates of detected malicious manipulation</p>
+            </div>
+          </div>
+          
+          <div className="bg-[#111318] border border-white/10 rounded-3xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[14px] border-collapse min-w-[600px]">
+                <thead>
+                  <tr className="bg-white/[0.02] border-b border-white/10">
+                    {['ID','Classification','Coordinates (x, y)','Dimensions (w × h)','Status'].map(h => (
+                      <th key={h} className="text-left px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {tamperedRegions.map((r, i) => (
+                    <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
+                      <td className="px-6 py-4 text-slate-500 font-mono">{(i + 1).toString().padStart(2, '0')}</td>
+                      <td className="px-6 py-4">
+                        <span className="font-mono text-[12px] bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-md text-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.05)]">
+                          {r.label.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-300 font-mono">[{r.x}, {r.y}]</td>
+                      <td className="px-6 py-4 text-slate-300 font-mono">{r.w}px × {r.h}px</td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[11px] font-bold tracking-widest uppercase rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                          Altered
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       )}
 
-      {/* Frame timeline (video only) */}
+      {/* Frame Timeline (Video Only) */}
       {fileType === 'video' && frameResults && (
-        <section className="mb-10">
-          <h2 className="font-display text-[1.5rem] font-normal mb-2">Frame Timeline</h2>
-          <p className="text-secondary text-[13px] mb-4">Per-frame tampering detection across the video</p>
-          <div className="bg-card border border-border rounded-2xl p-6">
-            <div className="flex flex-wrap gap-2 mb-4">
-              {frameResults.map(f => (
-                <div key={f.frame}
-                  title={`Frame ${f.frame}: ${f.status} (${(f.confidence * 100).toFixed(0)}%)`}
-                  className={`w-11 h-11 rounded-lg flex items-center justify-center text-[11px] font-semibold cursor-pointer hover:scale-110 transition-transform border-[1.5px]
-                    ${f.status === 'tampered'
-                      ? 'bg-danger/10 text-danger border-red-300'
-                      : 'bg-success/10 text-success border-green-300'}`}>
-                  {f.frame}
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-5 text-[12px] text-secondary">
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-success inline-block" />Authentic</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-danger inline-block" />Tampered</span>
+        <section className="mb-16">
+          <div className="flex items-center gap-3 mb-6">
+            <Icon icon="lucide:film" className="text-cyan-400" width="24" />
+            <div>
+              <h2 className="text-[22px] font-medium text-white leading-none mb-1">Temporal Analysis</h2>
+              <p className="text-slate-400 text-[14px]">Per-frame tampering detection across the timeline</p>
             </div>
           </div>
-        </section>
-      )}
-
-      {/* Attention heatmap */}
-      <section className="mb-10">
-        <h2 className="font-display text-[1.5rem] font-normal mb-2">Attention Map</h2>
-        <p className="text-secondary text-[13px] mb-4">Regions where watermark signal was strongest / weakest</p>
-        <div className="bg-card border border-border rounded-2xl p-6">
-          <div className="flex flex-col items-center gap-4">
-            <div className="grid grid-cols-8 gap-0.5 w-full max-w-[480px] rounded-xl overflow-hidden">
-              {Array.from({ length: 64 }, (_, i) => {
-                const inRegion = tamperedRegions.some(r => {
-                  const col = i % 8; const row = Math.floor(i / 8)
-                  return col >= Math.floor(r.x / 40) && col < Math.floor((r.x + r.w) / 40) &&
-                         row >= Math.floor(r.y / 30) && row < Math.floor((r.y + r.h) / 30)
-                })
-                const heat = inRegion ? 0.9 + Math.random() * 0.1 : 0.1 + Math.random() * 0.3
-                const rv = Math.floor(255 * heat); const gv = Math.floor(80 * (1 - heat))
+          
+          <div className="bg-[#111318] border border-white/10 rounded-3xl p-8 shadow-xl">
+            <div className="flex flex-wrap gap-2 mb-6">
+              {frameResults.map(f => {
+                const isT = f.status === 'tampered'
                 return (
-                  <div key={i} className="aspect-square rounded-sm"
-                    style={{ background: `rgb(${rv},${gv},20)`, opacity: 0.5 + heat * 0.5 }} />
+                  <div key={f.frame}
+                    title={`Frame ${f.frame}: ${f.status.toUpperCase()} (${(f.confidence * 100).toFixed(0)}%)`}
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center text-[12px] font-mono font-bold cursor-pointer transition-all duration-300 hover:scale-110 hover:-translate-y-1
+                      ${isT 
+                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:shadow-[0_0_15px_rgba(244,63,94,0.3)] hover:bg-rose-500/20' 
+                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:bg-emerald-500/20'}`}>
+                    {f.frame}
+                  </div>
                 )
               })}
             </div>
-            <p className="text-[12px] text-muted">Brighter red = higher tampering signal</p>
+            
+            <div className="flex gap-6 text-[12px] font-bold tracking-widest uppercase text-slate-500 border-t border-white/5 pt-6 mt-2">
+              <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-emerald-500/50 border border-emerald-500" /> Authentic Frame</span>
+              <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-rose-500/50 border border-rose-500" /> Tampered Frame</span>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Attention Heatmap */}
+      <section className="mb-16">
+        <div className="flex items-center gap-3 mb-6">
+          <Icon icon="lucide:activity" className="text-cyan-400" width="24" />
+          <div>
+            <h2 className="text-[22px] font-medium text-white leading-none mb-1">Signal Attention Map</h2>
+            <p className="text-slate-400 text-[14px]">Regions where the neural watermark signal was disrupted</p>
+          </div>
+        </div>
+
+        <div className="bg-[#111318] border border-white/10 rounded-3xl p-8 shadow-xl flex flex-col md:flex-row items-center gap-10">
+          
+          {/* Simulated Matrix Heatmap */}
+          <div className="grid grid-cols-8 gap-1 w-full max-w-[400px] p-2 bg-[#0a0a0c] rounded-2xl border border-white/5 shadow-inner">
+            {Array.from({ length: 64 }, (_, i) => {
+              const inRegion = tamperedRegions.some(r => {
+                const col = i % 8; const row = Math.floor(i / 8)
+                return col >= Math.floor(r.x / 40) && col < Math.floor((r.x + r.w) / 40) &&
+                       row >= Math.floor(r.y / 30) && row < Math.floor((r.y + r.h) / 30)
+              })
+              
+              // Cyber-theme heatmap: Cyan (safe) to Rose (tampered)
+              const heat = inRegion ? 0.8 + Math.random() * 0.2 : 0.1 + Math.random() * 0.2
+              
+              return (
+                <div key={i} className={`aspect-square rounded-[4px] transition-colors duration-1000 ${inRegion ? 'animate-pulse' : ''}`}
+                  style={{ 
+                    backgroundColor: inRegion ? `rgba(244, 63, 94, ${heat})` : `rgba(34, 211, 238, ${heat * 0.3})`,
+                    boxShadow: inRegion ? `0 0 ${10 * heat}px rgba(244, 63, 94, ${heat * 0.5})` : 'none',
+                    border: '1px solid rgba(255,255,255,0.02)'
+                  }} 
+                />
+              )
+            })}
+          </div>
+          
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3 text-[13px] text-slate-300">
+              <div className="w-4 h-4 rounded bg-rose-500/80 border border-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
+              <span className="font-medium">High Disruption (Tampered)</span>
+            </div>
+            <div className="flex items-center gap-3 text-[13px] text-slate-300">
+              <div className="w-4 h-4 rounded bg-cyan-500/20 border border-cyan-500/30" />
+              <span className="font-medium">Stable Signal (Authentic)</span>
+            </div>
+            <p className="text-[13px] text-slate-500 max-w-[300px] mt-4 leading-relaxed border-l-2 border-white/10 pl-4">
+              The neural decoder highlights grid cells where the expected HIDDeN bit payload deviates significantly from the extracted payload, indicating spatial manipulation.
+            </p>
           </div>
         </div>
       </section>
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-4 pt-4">
         <button onClick={() => navigate('verify')}
-          className="px-6 py-3.5 bg-primary text-white font-medium rounded-xl hover:bg-[#333] transition-all text-[14px]">
+          className="px-8 py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all text-[15px] flex items-center gap-2">
+          <Icon icon="lucide:scan-line" width="18" />
           Analyze Another File
         </button>
         <button onClick={() => {
           const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })
           const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-          a.download = 'waterguard_report.json'; a.click()
-        }} className="px-6 py-3.5 border-[1.5px] border-border-strong text-primary font-medium rounded-xl hover:border-primary hover:bg-subtle transition-all text-[14px]">
-          Download Report (JSON)
+          a.download = `waterguard_report_${Date.now()}.json`; a.click()
+        }} className="px-8 py-4 bg-[#111318] border border-white/10 text-white font-medium rounded-xl hover:bg-white/5 hover:border-white/20 transition-all text-[15px] flex items-center gap-2">
+          <Icon icon="lucide:download" width="18" />
+          Download Raw JSON Report
         </button>
       </div>
 
