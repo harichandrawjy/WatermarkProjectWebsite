@@ -1,10 +1,10 @@
 import { Icon } from '@iconify/react'
 
 const TEAM = [
-  { name: '彭定康', id: 'D1229568', role: 'Encoder / Decoder / Frontend',    initial: '彭' },
-  { name: '張志成', id: 'D1231400', role: 'Tamper Detection / Backend',       initial: '張' },
-  { name: '吳尚恩', id: 'D1249268', role: 'Tamper Localization / Frontend',   initial: '吳' },
-  { name: '鄭建良', id: 'D1231150', role: 'Encoder / Decoder / Backend',      initial: '鄭' },
+  { name: '彭定康', id: 'D1229568', role: 'Embedder / Extractor',    initial: '彭' },
+  { name: '張志成', id: 'D1231400', role: 'Website / API',       initial: '張' },
+  { name: '吳尚恩', id: 'D1249268', role: 'Website / API',   initial: '吳' },
+  { name: '鄭建良', id: 'D1231150', role: 'Embedder / Extractor',      initial: '鄭' },
 ]
 
 const TECH = [
