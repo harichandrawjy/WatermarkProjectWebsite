@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import type { AnalysisResult } from '../App'
+import { Icon } from '@iconify/react'
 
 interface VerifyProps {
   onComplete: (r: AnalysisResult) => void
@@ -51,11 +52,11 @@ const DETECT_ITEMS = [
 ]
 
 export default function Verify({ onComplete }: VerifyProps) {
-  const [stage,    setStage]    = useState<Stage>('idle')
-  const [file,     setFile]     = useState<File | null>(null)
-  const [preview,  setPreview]  = useState<string | null>(null)
-  const [stepIdx,  setStepIdx]  = useState(0)
-  const [progress, setProgress] = useState(0)
+  const [stage,     setStage]    = useState<Stage>('idle')
+  const [file,      setFile]     = useState<File | null>(null)
+  const [preview,   setPreview]  = useState<string | null>(null)
+  const [stepIdx,   setStepIdx]  = useState(0)
+  const [progress,  setProgress] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = (f: File) => {
@@ -86,101 +87,130 @@ export default function Verify({ onComplete }: VerifyProps) {
   const reset = () => { setFile(null); setPreview(null); setStage('idle'); setProgress(0); setStepIdx(0) }
 
   return (
-    <div className="max-w-[1100px] mx-auto px-7 pb-20">
+    <div className="max-w-[1100px] mx-auto px-7 pb-20 relative z-10 font-sans text-slate-300">
+
+      {/* Background Ambient Glow */}
+      <div className="absolute top-[10%] left-[60%] w-[40%] h-[30%] bg-rose-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
 
       {/* Header */}
       <div className="text-center pt-16 pb-12">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-danger/10 text-danger text-[12px] font-semibold rounded-full mb-5">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="m9 12 2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          Step 2 — Watermark Verification
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[12px] font-semibold rounded-full mb-5 backdrop-blur-md">
+          <Icon icon="lucide:shield-alert" width="16" />
+          Step 2 — Integrity Verification
         </div>
-        <h1 className="font-display text-[clamp(2.2rem,5vw,3.4rem)] font-normal mb-4 leading-tight">Verify Integrity</h1>
-        <p className="text-secondary text-[1.05rem] max-w-lg mx-auto">
-          Upload your watermarked image or video. We'll extract the watermark signal and detect
-          exactly where and when any tampering occurred.
+        <h1 className="font-display text-[clamp(2.2rem,5vw,3.4rem)] text-white font-normal mb-4 leading-tight tracking-tight">Verify Integrity</h1>
+        <p className="text-slate-400 text-[1.05rem] max-w-lg mx-auto leading-relaxed">
+          Upload your watermarked image or video. We'll extract the neural signal to detect
+          exactly where and when any malicious tampering occurred.
         </p>
       </div>
 
       {/* How it works strip */}
-      <div className="grid grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
         {[
-          { n: '01', title: 'Upload watermarked file', desc: 'The file you previously encoded' },
-          { n: '02', title: 'We extract & verify',     desc: 'Decoder checks every region\'s watermark' },
-          { n: '03', title: 'See the full report',     desc: 'Tampered regions highlighted with details' },
+          { n: '01', title: 'Upload media', desc: 'The previously protected file' },
+          { n: '02', title: 'Extract & Verify',     desc: 'Decoder checks pixel regions' },
+          { n: '03', title: 'Review Report',     desc: 'View localized tampering data' },
         ].map((s, i) => (
-          <div key={i} className="bg-card border border-border rounded-2xl px-5 py-4 flex items-center gap-4">
-            <div className="w-9 h-9 rounded-full bg-danger/10 text-danger flex items-center justify-center text-[12px] font-bold shrink-0">{s.n}</div>
+          <div key={i} className="bg-[#111318]/80 backdrop-blur-sm border border-white/5 rounded-2xl px-5 py-4 flex items-center gap-4">
+            <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center text-[12px] font-bold shrink-0 shadow-[0_0_10px_rgba(244,63,94,0.1)]">{s.n}</div>
             <div>
-              <div className="font-semibold text-[13px]">{s.title}</div>
-              <div className="text-[12px] text-secondary">{s.desc}</div>
+              <div className="font-medium text-white text-[13.5px] mb-0.5">{s.title}</div>
+              <div className="text-[12px] text-slate-400">{s.desc}</div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8 items-start">
 
         {/* Main area */}
-        <div>
+        <div className="w-full">
 
           {stage === 'verifying' ? (
             /* ── VERIFYING progress ── */
-            <div className="bg-card border border-border rounded-2xl p-12 flex flex-col items-center gap-5 text-center">
-              <div className="w-14 h-14 border-[3px] border-border border-t-danger rounded-full animate-spin-slow" />
-              <h3 className="font-display text-[1.6rem] font-normal">Verifying Watermark</h3>
-              <p className="text-secondary text-[13.5px] min-h-[20px]">{VERIFY_STEPS[stepIdx]}</p>
-              <div className="w-full max-w-sm h-1.5 bg-subtle rounded-full overflow-hidden">
-                <div className="h-full bg-danger rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+            <div className="bg-[#111318] border border-white/5 rounded-3xl p-12 flex flex-col items-center gap-6 text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-64 h-64 bg-rose-500/10 rounded-full blur-[80px] -ml-20 -mt-20 pointer-events-none" />
+              
+              <div className="relative w-16 h-16 flex items-center justify-center mb-2">
+                <div className="absolute inset-0 border-[3px] border-white/5 border-t-rose-400 rounded-full animate-spin" />
+                <div className="absolute inset-2 border-[3px] border-white/5 border-b-amber-400 rounded-full animate-spin-slow opacity-70" />
               </div>
-              <span className="text-[13px] text-secondary">{progress}%</span>
-              <div className="flex flex-col gap-2 w-full max-w-sm mt-2 text-left">
-                {VERIFY_STEPS.map((s, i) => (
-                  <div key={i} className={`flex items-center gap-3 text-[12.5px] transition-colors
-                    ${i < stepIdx ? 'text-success' : i === stepIdx ? 'text-primary font-medium' : 'text-muted'}`}>
-                    <span className="w-4 shrink-0 text-center">{i < stepIdx ? '✓' : i === stepIdx ? '◉' : '○'}</span>
-                    {s}
-                  </div>
-                ))}
+              
+              <div>
+                <h3 className="font-display text-[1.8rem] text-white font-normal mb-1">Analyzing Media</h3>
+                <p className="text-rose-400 text-[14px] font-medium min-h-[20px]">{VERIFY_STEPS[stepIdx]}</p>
+              </div>
+
+              <div className="w-full max-w-sm mt-2">
+                <div className="flex justify-between text-[12px] font-bold text-slate-400 mb-2">
+                  <span>Processing...</span>
+                  <span className="text-white">{progress}%</span>
+                </div>
+                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                  <div className="h-full bg-gradient-to-r from-rose-500 to-amber-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 w-full max-w-sm mt-6 text-left border-t border-white/5 pt-6">
+                {VERIFY_STEPS.map((s, i) => {
+                  const isDone = i < stepIdx;
+                  const isCurrent = i === stepIdx;
+                  return (
+                    <div key={i} className={`flex items-center gap-3 text-[13px] transition-colors duration-300
+                      ${isDone ? 'text-amber-400' : isCurrent ? 'text-white font-medium' : 'text-slate-600'}`}>
+                      <span className="w-5 shrink-0 flex justify-center">
+                        {isDone ? <Icon icon="lucide:check-circle-2" width="16" /> : 
+                         isCurrent ? <span className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e] animate-pulse" /> : 
+                         <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
+                      </span>
+                      {s}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
           ) : stage === 'preview' && file ? (
             /* ── PREVIEW before verifying ── */
-            <div className="bg-card border border-border rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-border gap-3 flex-wrap">
+            <div className="bg-[#111318] border border-white/10 rounded-3xl overflow-hidden shadow-xl">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 gap-3 bg-white/[0.02]">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className="font-medium text-[13.5px] text-primary">{file.name}</span>
-                  <span className="px-2.5 py-0.5 bg-accent-light text-accent text-[11px] font-semibold rounded-full">
+                  <Icon icon="lucide:file-search" className="text-slate-400" width="18" />
+                  <span className="font-medium text-[14px] text-white">{file.name}</span>
+                  <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-slate-300 text-[10px] uppercase tracking-widest font-bold rounded-md">
                     {file.type.startsWith('video/') ? 'Video' : 'Image'}
                   </span>
-                  <span className="text-[12px] text-muted">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                  <span className="text-[12px] text-slate-500 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
                 <button onClick={reset}
-                  className="text-[13px] text-secondary hover:text-primary hover:bg-subtle px-3 py-1.5 rounded-lg transition-all">
-                  ✕ Remove
+                  className="text-[13px] text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
+                  <Icon icon="lucide:x" width="14" /> Remove
                 </button>
               </div>
 
-              {preview && (
-                file.type.startsWith('video/')
-                  ? <video className="w-full max-h-[400px] object-contain bg-black block" src={preview} controls />
-                  : <img   className="w-full max-h-[400px] object-contain bg-black block" src={preview} alt="preview" />
-              )}
+              <div className="bg-[#0a0a0c] p-6 flex justify-center border-b border-white/5">
+                {preview && (
+                  file.type.startsWith('video/')
+                    ? <video className="w-full max-h-[400px] object-contain rounded-lg border border-white/10 shadow-2xl" src={preview} controls />
+                    : <img   className="w-full max-h-[400px] object-contain rounded-lg border border-white/10 shadow-2xl" src={preview} alt="preview" />
+                )}
+              </div>
 
               {/* Warning if not a watermarked file */}
-              <div className="mx-5 mt-4 px-4 py-3 bg-warning/5 border border-yellow-200 rounded-xl flex items-start gap-3">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="text-warning shrink-0 mt-0.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z" stroke="currentColor" strokeWidth="1.8"/><path d="M12 9v4M12 17h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                <p className="text-[12px] text-secondary">
-                  Make sure this file was previously watermarked using our <strong className="text-primary">Encode</strong> page.
-                  Verifying a non-watermarked file will always return a tampered result.
+              <div className="mx-6 mt-6 px-5 py-4 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-start gap-3">
+                <Icon icon="lucide:alert-triangle" className="text-amber-400 shrink-0 mt-0.5" width="18" />
+                <p className="text-[13px] text-slate-300 leading-relaxed">
+                  Make sure this file was previously watermarked using our <strong className="text-white font-semibold">Encode</strong> suite.
+                  Verifying an unprotected, standard file will always return a <strong className="text-rose-400 font-semibold">Tampered</strong> result.
                 </p>
               </div>
 
-              <div className="p-5">
+              <div className="p-6">
                 <button onClick={startVerify}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-primary text-white font-medium rounded-xl hover:bg-[#333] transition-all text-[15px]">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="1.8"/><path d="m9 12 2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Run Verification
+                  className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-rose-500 text-white font-bold rounded-xl hover:bg-rose-400 hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] transition-all text-[15px]">
+                  <Icon icon="lucide:scan" width="18" />
+                  Run Integrity Verification
                 </button>
               </div>
             </div>
@@ -192,67 +222,83 @@ export default function Verify({ onComplete }: VerifyProps) {
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragLeave={() => setStage('idle')}
-              className={`border-2 border-dashed rounded-2xl p-20 text-center cursor-pointer transition-all duration-200
+              className={`border-[1.5px] border-dashed rounded-3xl p-20 text-center cursor-pointer transition-all duration-300 relative overflow-hidden group
                 ${stage === 'dragging'
-                  ? 'border-danger bg-danger/5'
-                  : 'border-border-strong bg-card hover:border-danger hover:bg-danger/5'}`}>
+                  ? 'border-rose-400 bg-rose-500/5 shadow-[0_0_30px_rgba(244,63,94,0.1)] scale-[1.01]'
+                  : 'border-white/20 bg-[#111318] hover:border-rose-500/50 hover:bg-white/[0.02]'}`}>
+              
+              <div className={`absolute inset-0 bg-gradient-to-b from-rose-500/5 to-transparent opacity-0 transition-opacity duration-300 ${stage === 'dragging' ? 'opacity-100' : 'group-hover:opacity-100'}`} />
+
               <input ref={inputRef} type="file" accept="image/*,video/*" className="hidden"
                 onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }} />
-              <div className="w-[72px] h-[72px] rounded-full bg-subtle text-danger flex items-center justify-center mx-auto mb-5">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
-                  <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
+              
+              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-all duration-300 relative z-10
+                ${stage === 'dragging' ? 'bg-rose-500/20 text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.3)]' : 'bg-white/5 text-slate-400 group-hover:bg-rose-500/10 group-hover:text-rose-400'}`}>
+                <Icon icon="lucide:file-search" width="36" height="36" strokeWidth="1.5" />
               </div>
-              <h3 className="font-display text-[1.5rem] font-normal mb-2">Drop your watermarked file here</h3>
-              <p className="text-secondary text-[14px] mb-5">or click to browse</p>
-              <div className="flex gap-2 justify-center flex-wrap mb-3">
+              
+              <h3 className="font-display text-[1.6rem] text-white font-normal mb-2 relative z-10">Select or drop file</h3>
+              <p className="text-slate-400 text-[14px] mb-6 relative z-10">Upload a watermarked file to run analysis</p>
+              
+              <div className="flex gap-2 justify-center flex-wrap mb-4 relative z-10">
                 {['JPG','PNG','MP4','AVI','MOV'].map(t => (
-                  <span key={t} className="px-2.5 py-1 bg-danger/10 text-danger text-[11px] font-semibold rounded-full">{t}</span>
+                  <span key={t} className="px-3 py-1 bg-white/5 border border-white/10 text-slate-300 text-[10px] font-bold tracking-widest rounded-md uppercase">{t}</span>
                 ))}
               </div>
-              <p className="text-[12px] text-muted">Max file size: 100 MB</p>
+              <p className="text-[12px] text-slate-500 font-mono relative z-10">Max file size: 100 MB</p>
             </div>
           )}
         </div>
 
         {/* Sidebar */}
-        <aside className="flex flex-col gap-4">
-          <div className="bg-card border border-border rounded-2xl p-5">
-            <h4 className="font-semibold text-[13px] mb-3 text-primary">What we detect</h4>
-            <ul className="flex flex-col gap-2">
+        <aside className="flex flex-col gap-5 w-full">
+          
+          <div className="bg-[#111318] border border-white/5 rounded-3xl p-6 shadow-lg">
+            <h4 className="font-medium text-[14px] mb-5 text-white flex items-center gap-2">
+              <Icon icon="lucide:target" className="text-rose-400" width="18" />
+              What we detect
+            </h4>
+            <ul className="flex flex-col gap-4">
               {DETECT_ITEMS.map((item, i) => (
-                <li key={i} className="flex items-center gap-2.5 text-[12.5px] text-secondary">
-                  <span className="w-1.5 h-1.5 rounded-full bg-danger shrink-0" />{item}
+                <li key={i} className="flex items-center gap-3 text-[13px] text-slate-400 leading-relaxed">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0 shadow-[0_0_8px_#f43f5e]" />
+                  {item}
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="bg-card border border-border rounded-2xl p-5">
-            <h4 className="font-semibold text-[13px] mb-3 text-primary">What you get back</h4>
-            <ul className="flex flex-col gap-3">
+          <div className="bg-[#111318] border border-white/5 rounded-3xl p-6 shadow-lg">
+            <h4 className="font-medium text-[14px] mb-5 text-white flex items-center gap-2">
+              <Icon icon="lucide:file-text" className="text-cyan-400" width="18" />
+              What you get back
+            </h4>
+            <ul className="flex flex-col gap-4">
               {[
-                { icon: '✅', text: 'Authentic / Tampered verdict with confidence score' },
-                { icon: '📍', text: 'Exact pixel regions that were altered' },
-                { icon: '🎞️', text: 'Per-frame timeline for video files' },
-                { icon: '🌡️', text: 'Attention heatmap of watermark signal' },
-                { icon: '📄', text: 'Downloadable JSON report' },
+                { icon: 'lucide:badge-check', text: 'Authentic / Tampered verdict with confidence score' },
+                { icon: 'lucide:map-pin', text: 'Exact spatial pixel regions that were altered' },
+                { icon: 'lucide:film', text: 'Per-frame timeline analysis for video files' },
+                { icon: 'lucide:activity', text: 'Visual attention heatmap of watermark signal' },
+                { icon: 'lucide:download-cloud', text: 'Downloadable structured JSON report' },
               ].map((item, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-[12.5px] text-secondary">
-                  <span className="text-base shrink-0">{item.icon}</span>{item.text}
+                <li key={i} className="flex items-start gap-3 text-[13px] text-slate-400 leading-relaxed">
+                  <Icon icon={item.icon} className="text-slate-500 shrink-0 mt-0.5" width="16" />
+                  {item.text}
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="bg-danger/5 border border-red-200 rounded-2xl p-5">
-            <h4 className="font-semibold text-[13px] mb-2 text-primary">Privacy Notice</h4>
-            <p className="text-[12.5px] text-secondary leading-relaxed">
-              Uploaded files are processed only for analysis and deleted immediately after.
-              No media is stored on our servers.
+          <div className="bg-gradient-to-br from-emerald-500/5 to-[#111318] border border-emerald-500/20 rounded-3xl p-6">
+            <h4 className="font-medium text-[14px] mb-3 text-emerald-400 flex items-center gap-2">
+              <Icon icon="lucide:lock" width="16" />
+              Privacy Notice
+            </h4>
+            <p className="text-[12.5px] text-slate-300 leading-relaxed">
+              Uploaded files are processed securely in memory for analysis only and are deleted immediately after the report is generated. No media is stored on our servers.
             </p>
           </div>
+
         </aside>
       </div>
     </div>
