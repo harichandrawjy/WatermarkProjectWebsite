@@ -1,5 +1,10 @@
 import { useState, useRef, useCallback } from 'react'
+import type { Page } from '../App'
 import { Icon } from '@iconify/react'
+
+interface EncodeProps {
+  navigate: (p: Page) => void
+}
 
 type Stage = 'idle' | 'dragging' | 'preview' | 'encoding' | 'done'
 
@@ -12,7 +17,7 @@ const ENCODE_STEPS = [
   'Finalizing watermarked output...',
 ]
 
-export default function Encode() {
+export default function Encode({ navigate }: EncodeProps) {
   const [stage,       setStage]      = useState<Stage>('idle')
   const [file,        setFile]       = useState<File | null>(null)
   const [preview,     setPreview]    = useState<string | null>(null)
@@ -170,7 +175,7 @@ export default function Encode() {
                 <Icon icon="lucide:info" className="text-cyan-400 shrink-0 mt-0.5" width="18" height="18" />
                 <p className="text-[13px] text-slate-300 leading-relaxed">
                   <strong className="text-white font-semibold">Keep the original safe.</strong> Share or distribute this protected version.
-                  If it gets tampered with, upload it to the <strong className="text-cyan-400 font-semibold cursor-pointer hover:underline" onClick={() => window.location.href='/verify'}>Verify</strong> page to detect and localize modifications.
+                  If it gets tampered with, upload it to the <button type="button" className="text-cyan-400 font-semibold cursor-pointer hover:underline" onClick={() => navigate('verify')}>Verify</button> page to detect and localize modifications.
                 </p>
               </div>
 
@@ -318,7 +323,7 @@ export default function Encode() {
             <p className="text-[13px] text-slate-300 leading-relaxed mb-4">
               After downloading the watermarked file, distribute it freely. If you suspect it gets manipulated later, upload it to the <strong className="text-white font-semibold">Verify</strong> suite to run spatial analysis.
             </p>
-            <button onClick={() => window.location.href='/verify'} className="text-[12px] font-bold tracking-widest uppercase text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1">
+            <button onClick={() => navigate('verify')} className="text-[12px] font-bold tracking-widest uppercase text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1">
               Go to Verify <Icon icon="lucide:arrow-right" width="14" />
             </button>
           </div>
