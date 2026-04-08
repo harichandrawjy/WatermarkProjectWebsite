@@ -56,7 +56,7 @@ export default function App() {
       */}
       <main className={`flex-1 ${page === 'home' ? '' : 'pt-[72px]'}`}>
         {page === 'home'    && <Home navigate={navigate} />}
-        {page === 'encode'  && <Encode />}
+        {page === 'encode'  && <Encode navigate={navigate} />}
         {page === 'verify'  && <Verify onComplete={handleVerifyComplete} />}
         {page === 'results' && <Results result={result} navigate={navigate} />}
         {page === 'about'   && <About />}
