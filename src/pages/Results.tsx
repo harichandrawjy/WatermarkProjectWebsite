@@ -50,7 +50,7 @@ export default function Results({ result, navigate }: ResultsProps) {
     </div>
   )
 
-  const { status, confidence, psnr, wmAccuracy, ber, tamperedRegions, frameResults, fileName, fileType } = result
+  const { status, confidence, wmAccuracy, ber, tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight } = result
   const tampered = status === 'tampered'
 
   return (
@@ -95,7 +95,6 @@ export default function Results({ result, navigate }: ResultsProps) {
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-16">
         <MetricCard label="Detection Status" value={tampered ? 'Tampered' : 'Authentic'} sub="Watermark integrity check" danger={tampered} highlight={!tampered} />
-        <MetricCard label="PSNR" value={`${psnr.toFixed(1)} dB`} sub="Image quality parameter" />
         <MetricCard label="WM Accuracy" value={`${(wmAccuracy * 100).toFixed(1)}%`} sub="Watermark bit recovery rate" />
         <MetricCard label="Bit Error Rate" value={ber.toFixed(4)} sub="BER (lower = better integrity)" />
         <MetricCard label="Regions Flagged" value={String(tamperedRegions.length)} sub={tampered ? 'Areas of concern localized' : 'No regions flagged'} danger={tampered && tamperedRegions.length > 0} />
@@ -197,28 +196,53 @@ export default function Results({ result, navigate }: ResultsProps) {
 
         <div className="bg-[#111318] border border-white/10 rounded-3xl p-8 shadow-xl flex flex-col md:flex-row items-center gap-10">
           
-          {/* Simulated Matrix Heatmap */}
-          <div className="grid grid-cols-8 gap-1 w-full max-w-[400px] p-2 bg-[#0a0a0c] rounded-2xl border border-white/5 shadow-inner">
-            {Array.from({ length: 64 }, (_, i) => {
-              const inRegion = tamperedRegions.some(r => {
-                const col = i % 8; const row = Math.floor(i / 8)
-                return col >= Math.floor(r.x / 40) && col < Math.floor((r.x + r.w) / 40) &&
-                       row >= Math.floor(r.y / 30) && row < Math.floor((r.y + r.h) / 30)
+          {/* Signal Attention Heatmap — 32×32 grid scaled to actual image coordinates */}
+          <div className="w-full max-w-[480px] p-2 bg-[#0a0a0c] rounded-2xl border border-white/5 shadow-inner">
+            {(() => {
+              const COLS = 32
+              const ROWS = 32
+              // Fallback: if backend didn't send image dimensions, assume square sized
+              // by the largest tampered-region extent. Avoids false aspect-ratio distortion.
+              const fallbackMax = tamperedRegions.length > 0
+                ? Math.max(...tamperedRegions.flatMap(r => [r.x + r.w, r.y + r.h]))
+                : 320
+              const maxX = imageWidth  ?? fallbackMax
+              const maxY = imageHeight ?? fallbackMax
+
+              const cells = Array.from({ length: COLS * ROWS }, (_, i) => {
+                const col = i % COLS
+                const row = Math.floor(i / COLS)
+                const cellX    = (col / COLS) * maxX
+                const cellXEnd = ((col + 1) / COLS) * maxX
+                const cellY    = (row / ROWS) * maxY
+                const cellYEnd = ((row + 1) / ROWS) * maxY
+
+                const hits = tamperedRegions.filter(r =>
+                  r.x < cellXEnd && (r.x + r.w) > cellX &&
+                  r.y < cellYEnd && (r.y + r.h) > cellY
+                ).length
+                const inRegion = hits > 0
+                const heat = inRegion ? Math.min(0.5 + hits * 0.15, 1) : 0.15
+
+                return (
+                  <div key={i} style={{
+                    backgroundColor: inRegion ? `rgba(244, 63, 94, ${heat})` : `rgba(34, 211, 238, ${heat * 0.25})`,
+                    boxShadow: inRegion ? `0 0 ${4 * heat}px rgba(244, 63, 94, ${heat * 0.4})` : 'none',
+                  }} />
+                )
               })
-              
-              // Cyber-theme heatmap: Cyan (safe) to Rose (tampered)
-              const heat = inRegion ? 0.8 + Math.random() * 0.2 : 0.1 + Math.random() * 0.2
-              
+
               return (
-                <div key={i} className={`aspect-square rounded-[4px] transition-colors duration-1000 ${inRegion ? 'animate-pulse' : ''}`}
-                  style={{ 
-                    backgroundColor: inRegion ? `rgba(244, 63, 94, ${heat})` : `rgba(34, 211, 238, ${heat * 0.3})`,
-                    boxShadow: inRegion ? `0 0 ${10 * heat}px rgba(244, 63, 94, ${heat * 0.5})` : 'none',
-                    border: '1px solid rgba(255,255,255,0.02)'
-                  }} 
-                />
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+                  gap: '1px',
+                  aspectRatio: `${maxX} / ${maxY}`,
+                }}>
+                  {cells}
+                </div>
               )
-            })}
+            })()}
           </div>
           
           <div className="flex flex-col gap-4">

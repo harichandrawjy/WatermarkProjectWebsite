@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import type { Page } from '../App'
 import { Icon } from '@iconify/react'
 
@@ -6,7 +6,9 @@ interface EncodeProps {
   navigate: (p: Page) => void
 }
 
-type Stage = 'idle' | 'dragging' | 'preview' | 'encoding' | 'done'
+type Stage = 'idle' | 'dragging' | 'preview' | 'encoding' | 'done' | 'error'
+
+const API_BASE = 'http://localhost:8000'
 
 const ENCODE_STEPS = [
   'Reading media file...',
@@ -17,6 +19,15 @@ const ENCODE_STEPS = [
   'Finalizing watermarked output...',
 ]
 
+interface EncodeResponse {
+  id: string
+  kind: 'image' | 'video'
+  watermarked_url: string
+  metadata_url: string
+  metadata: Record<string, unknown>
+  psnr_db: number
+}
+
 export default function Encode({ navigate }: EncodeProps) {
   const [stage,       setStage]      = useState<Stage>('idle')
   const [file,        setFile]       = useState<File | null>(null)
@@ -25,6 +36,11 @@ export default function Encode({ navigate }: EncodeProps) {
   const [progress,    setProgress]   = useState(0)
   const [wmPreview,   setWmPreview]  = useState<string | null>(null)
   const [psnr,        setPsnr]       = useState(0)
+  const [owner,       setOwner]      = useState('')
+  const [mediaId,     setMediaId]    = useState('')
+  const [encodedId,   setEncodedId]  = useState<string | null>(null)
+  const [encodedKind, setEncodedKind] = useState<'image' | 'video'>('image')
+  const [errorMsg,    setErrorMsg]   = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = (f: File) => {
@@ -37,40 +53,92 @@ export default function Encode({ navigate }: EncodeProps) {
   const onDrop     = useCallback((e: React.DragEvent) => { e.preventDefault(); setStage('idle'); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }, [])
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setStage('dragging') }
 
+  // Animate the step indicator on a loop while the request is in-flight.
+  useEffect(() => {
+    if (stage !== 'encoding') return
+    let i = 0
+    setStepIdx(0)
+    setProgress(5)
+    const t = setInterval(() => {
+      i = Math.min(i + 1, ENCODE_STEPS.length - 1)
+      setStepIdx(i)
+      setProgress(p => Math.min(p + 12, 92))
+    }, 600)
+    return () => clearInterval(t)
+  }, [stage])
+
   const startEncoding = async () => {
     if (!file) return
-    setStage('encoding')
-    setStepIdx(0); setProgress(0)
-
-    for (let i = 0; i < ENCODE_STEPS.length; i++) {
-      await new Promise(r => setTimeout(r, 500 + Math.random() * 400))
-      setStepIdx(i)
-      setProgress(Math.round(((i + 1) / ENCODE_STEPS.length) * 100))
+    if (!owner.trim() || !mediaId.trim()) {
+      setErrorMsg('Owner and Media ID are required.')
+      return
     }
+    setErrorMsg('')
+    setStage('encoding')
 
-    // Mock: reuse the original as the "watermarked" preview
-    // In production, this would be the URL returned by your FastAPI endpoint
-    setWmPreview(preview)
-    setPsnr(28 + Math.random() * 5)
-    setStage('done')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('owner', owner.trim())
+      fd.append('media_id', mediaId.trim())
+
+      const res = await fetch(`${API_BASE}/encode`, { method: 'POST', body: fd })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`Server returned ${res.status}: ${text || res.statusText}`)
+      }
+      const data: EncodeResponse = await res.json()
+
+      localStorage.setItem(`wm_meta_${data.id}`, JSON.stringify(data.metadata))
+      localStorage.setItem('wm_last_id', data.id)
+
+      setWmPreview(`${API_BASE}${data.watermarked_url}`)
+      setPsnr(data.psnr_db)
+      setEncodedId(data.id)
+      setEncodedKind(data.kind)
+      setProgress(100)
+      setStepIdx(ENCODE_STEPS.length - 1)
+      setStage('done')
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Encoding failed')
+      setStage('error')
+    }
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!wmPreview || !file) return
+    const res = await fetch(wmPreview)
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const ext = encodedKind === 'video' ? 'mkv' : 'png'
+    const base = file.name.replace(/\.[^.]+$/, '')
     const a = document.createElement('a')
-    a.href = wmPreview
-    a.download = `watermarked_${file.name}`
+    a.href = url
+    a.download = `watermarked_${base}.${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleDownloadMeta = () => {
+    if (!encodedId) return
+    const raw = localStorage.getItem(`wm_meta_${encodedId}`)
+    if (!raw) return
+    const blob = new Blob([raw], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `metadata_${encodedId}.json`
     a.click()
   }
 
   const reset = () => {
     setFile(null); setPreview(null); setWmPreview(null)
     setStage('idle'); setProgress(0); setStepIdx(0); setPsnr(0)
+    setEncodedId(null); setErrorMsg('')
   }
 
   return (
     <div className="max-w-[1100px] mx-auto px-7 pb-20 relative z-10">
-      
+
       {/* Background Ambient Glow */}
       <div className="absolute top-[10%] left-[20%] w-[40%] h-[30%] bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
 
@@ -120,7 +188,7 @@ export default function Encode({ navigate }: EncodeProps) {
                 </div>
                 <div>
                   <p className="font-semibold text-[14px] text-emerald-400">Watermark embedded successfully</p>
-                  <p className="text-[12.5px] text-emerald-400/70">PSNR: {psnr.toFixed(1)} dB — image quality preserved</p>
+                  <p className="text-[12.5px] text-emerald-400/70">PSNR: {psnr.toFixed(1)} dB · ID: {encodedId}</p>
                 </div>
               </div>
 
@@ -129,7 +197,9 @@ export default function Encode({ navigate }: EncodeProps) {
                 <div className="bg-[#0a0a0c] flex flex-col">
                   <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-5 py-3 border-b border-white/5 bg-[#111318]">Original</p>
                   <div className="p-4 flex-1 flex items-center justify-center">
-                    <img src={preview!} alt="original" className="max-w-full max-h-[300px] object-contain rounded-lg shadow-2xl" />
+                    {file.type.startsWith('video/')
+                      ? <video src={preview!} controls className="max-w-full max-h-[300px] object-contain rounded-lg shadow-2xl" />
+                      : <img src={preview!} alt="original" className="max-w-full max-h-[300px] object-contain rounded-lg shadow-2xl" />}
                   </div>
                 </div>
                 <div className="bg-[#0a0a0c] flex flex-col">
@@ -138,7 +208,9 @@ export default function Encode({ navigate }: EncodeProps) {
                     Protected
                   </p>
                   <div className="p-4 flex-1 flex items-center justify-center">
-                    <img src={wmPreview} alt="watermarked" className="max-w-full max-h-[300px] object-contain rounded-lg shadow-2xl" />
+                    {encodedKind === 'video'
+                      ? <video src={wmPreview} controls className="max-w-full max-h-[300px] object-contain rounded-lg shadow-2xl" />
+                      : <img src={wmPreview} alt="watermarked" className="max-w-full max-h-[300px] object-contain rounded-lg shadow-2xl" />}
                   </div>
                 </div>
               </div>
@@ -147,7 +219,7 @@ export default function Encode({ navigate }: EncodeProps) {
               <div className="grid grid-cols-3 divide-x divide-white/5 border-t border-white/5 bg-[#111318]">
                 {[
                   { label: 'PSNR', value: `${psnr.toFixed(1)} dB` },
-                  { label: 'Watermark', value: 'Embedded ✓' },
+                  { label: 'Watermark', value: 'Embedded' },
                   { label: 'File', value: file.name.length > 15 ? file.name.slice(0, 12) + '…' : file.name },
                 ].map((m, i) => (
                   <div key={i} className="px-5 py-4 text-center">
@@ -163,6 +235,11 @@ export default function Encode({ navigate }: EncodeProps) {
                   className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all text-[14.5px]">
                   <Icon icon="lucide:download" width="18" height="18" />
                   Download Protected File
+                </button>
+                <button onClick={handleDownloadMeta}
+                  className="flex items-center justify-center gap-2 px-6 py-4 border border-cyan-500/30 text-cyan-400 font-medium rounded-xl hover:bg-cyan-500/10 transition-all text-[14.5px]">
+                  <Icon icon="lucide:file-json" width="18" height="18" />
+                  metadata.json
                 </button>
                 <button onClick={reset}
                   className="px-6 py-4 border border-white/10 text-white font-medium rounded-xl hover:bg-white/5 transition-all text-[14.5px]">
@@ -185,12 +262,12 @@ export default function Encode({ navigate }: EncodeProps) {
             /* ── ENCODING progress ── */
             <div className="bg-[#111318] border border-white/5 rounded-3xl p-12 flex flex-col items-center gap-6 text-center relative overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-[80px] -mr-20 -mt-20 pointer-events-none" />
-              
+
               <div className="relative w-16 h-16 flex items-center justify-center mb-2">
                 <div className="absolute inset-0 border-[3px] border-white/5 border-t-cyan-400 rounded-full animate-spin" />
                 <div className="absolute inset-2 border-[3px] border-white/5 border-b-emerald-400 rounded-full animate-spin-slow opacity-70" />
               </div>
-              
+
               <div>
                 <h3 className="font-display text-[1.8rem] text-white font-normal mb-1">Embedding Watermark</h3>
                 <p className="text-cyan-400 text-[14px] font-medium min-h-[20px]">{ENCODE_STEPS[stepIdx]}</p>
@@ -214,8 +291,8 @@ export default function Encode({ navigate }: EncodeProps) {
                     <div key={i} className={`flex items-center gap-3 text-[13px] transition-colors duration-300
                       ${isDone ? 'text-emerald-400' : isCurrent ? 'text-white font-medium' : 'text-slate-600'}`}>
                       <span className="w-5 shrink-0 flex justify-center">
-                        {isDone ? <Icon icon="lucide:check-circle-2" width="16" /> : 
-                         isCurrent ? <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" /> : 
+                        {isDone ? <Icon icon="lucide:check-circle-2" width="16" /> :
+                         isCurrent ? <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" /> :
                          <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
                       </span>
                       {s}
@@ -223,6 +300,21 @@ export default function Encode({ navigate }: EncodeProps) {
                   )
                 })}
               </div>
+            </div>
+
+          ) : stage === 'error' ? (
+            /* ── ERROR ── */
+            <div className="bg-[#111318] border border-rose-500/30 rounded-3xl p-10 flex flex-col items-center text-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center">
+                <Icon icon="lucide:alert-octagon" width="24" />
+              </div>
+              <div>
+                <h3 className="font-display text-[1.4rem] text-white mb-1">Encoding failed</h3>
+                <p className="text-[13px] text-rose-300/80 max-w-md break-words">{errorMsg || 'Unknown error'}</p>
+              </div>
+              <button onClick={reset} className="px-6 py-3 border border-white/10 text-white font-medium rounded-xl hover:bg-white/5 transition-all text-[14px]">
+                Try Again
+              </button>
             </div>
 
           ) : stage === 'preview' && file ? (
@@ -251,6 +343,35 @@ export default function Encode({ navigate }: EncodeProps) {
                 )}
               </div>
 
+              {/* Owner / Media ID inputs */}
+              <div className="p-6 border-b border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Owner</label>
+                  <input
+                    type="text"
+                    value={owner}
+                    onChange={e => setOwner(e.target.value)}
+                    placeholder="e.g. alice@studio.com"
+                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Media ID</label>
+                  <input
+                    type="text"
+                    value={mediaId}
+                    onChange={e => setMediaId(e.target.value)}
+                    placeholder="e.g. project-2026-001"
+                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  />
+                </div>
+                {errorMsg && (
+                  <div className="sm:col-span-2 text-[12.5px] text-rose-400 flex items-center gap-2">
+                    <Icon icon="lucide:alert-circle" width="14" /> {errorMsg}
+                  </div>
+                )}
+              </div>
+
               <div className="p-6">
                 <button onClick={startEncoding}
                   className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all text-[15px]">
@@ -271,20 +392,20 @@ export default function Encode({ navigate }: EncodeProps) {
                 ${stage === 'dragging'
                   ? 'border-cyan-400 bg-cyan-500/5 shadow-[0_0_30px_rgba(34,211,238,0.1)] scale-[1.01]'
                   : 'border-white/20 bg-[#111318] hover:border-cyan-500/50 hover:bg-white/[0.02]'}`}>
-              
+
               <div className={`absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 transition-opacity duration-300 ${stage === 'dragging' ? 'opacity-100' : 'group-hover:opacity-100'}`} />
 
               <input ref={inputRef} type="file" accept="image/*,video/*" className="hidden"
                 onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }} />
-              
+
               <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-all duration-300 relative z-10
                 ${stage === 'dragging' ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)]' : 'bg-white/5 text-slate-400 group-hover:bg-cyan-500/10 group-hover:text-cyan-400'}`}>
                 <Icon icon="lucide:upload-cloud" width="36" height="36" strokeWidth="1.5" />
               </div>
-              
+
               <h3 className="font-display text-[1.6rem] text-white font-normal mb-2 relative z-10">Select or drop media</h3>
               <p className="text-slate-400 text-[14px] mb-6 relative z-10">Upload a clean file to begin the encoding process</p>
-              
+
               <div className="flex gap-2 justify-center flex-wrap mb-4 relative z-10">
                 {['JPG','PNG','MP4','AVI','MOV'].map(t => (
                   <span key={t} className="px-3 py-1 bg-white/5 border border-white/10 text-slate-300 text-[10px] font-bold tracking-widest rounded-md uppercase">{t}</span>
@@ -297,7 +418,7 @@ export default function Encode({ navigate }: EncodeProps) {
 
         {/* Sidebar */}
         <aside className="flex flex-col gap-5 w-full">
-          
+
           <div className="bg-[#111318] border border-white/5 rounded-3xl p-6 shadow-lg">
             <h4 className="font-medium text-[14px] mb-5 text-white flex items-center gap-2">
               <Icon icon="lucide:shield-check" className="text-cyan-400" width="18" />
