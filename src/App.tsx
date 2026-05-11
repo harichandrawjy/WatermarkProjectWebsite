@@ -21,13 +21,19 @@ export interface FrameResult {
 export interface AnalysisResult {
   status: 'tampered' | 'authentic'
   confidence: number
-  psnr: number
   wmAccuracy: number
   ber: number
   tamperedRegions: TamperedRegion[]
   frameResults?: FrameResult[]
   fileName: string
   fileType: 'image' | 'video'
+  watermarkFound?: boolean
+  ownerMatch?: boolean
+  mediaMatch?: boolean
+  framesChecked?: number
+  frameTamperRate?: number
+  imageWidth?: number
+  imageHeight?: number
 }
 
 export default function App() {
