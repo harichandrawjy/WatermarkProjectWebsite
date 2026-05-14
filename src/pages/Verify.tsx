@@ -9,7 +9,7 @@ interface VerifyProps {
 type Stage = 'idle' | 'dragging' | 'preview' | 'verifying' | 'error'
 type MetaSource = 'last' | 'id' | 'file'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 const VERIFY_STEPS = [
   'Reading watermarked file...',
