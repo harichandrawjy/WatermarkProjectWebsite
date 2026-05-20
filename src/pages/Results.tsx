@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { AnalysisResult, Page } from '../App'
 import { Icon } from '@iconify/react'
 
@@ -30,7 +31,8 @@ function MetricCard({ label, value, sub, danger, highlight }: MetricCardProps) {
 }
 
 export default function Results({ result, navigate }: ResultsProps) {
-  
+  const [selectedFrame, setSelectedFrame] = useState<number | null>(null)
+
   // Empty State
   if (!result) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-7 text-center relative z-10">
@@ -52,6 +54,15 @@ export default function Results({ result, navigate }: ResultsProps) {
 
   const { status, confidence, wmAccuracy, ber, tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight } = result
   const tampered = status === 'tampered'
+
+  // For video, the spatial heatmap reflects whichever frame is selected;
+  // image results use the single top-level tamperedRegions array.
+  const activeFrame = fileType === 'video' && frameResults
+    ? (frameResults.find(f => f.frame === selectedFrame) ?? frameResults[0])
+    : null
+  const heatmapRegions = activeFrame
+    ? (activeFrame.tamperedRegions ?? [])
+    : tamperedRegions
 
   return (
     <div className="max-w-[1100px] mx-auto px-7 pb-32 relative z-10">
@@ -97,7 +108,14 @@ export default function Results({ result, navigate }: ResultsProps) {
         <MetricCard label="Detection Status" value={tampered ? 'Tampered' : 'Authentic'} sub="Watermark integrity check" danger={tampered} highlight={!tampered} />
         <MetricCard label="WM Accuracy" value={`${(wmAccuracy * 100).toFixed(1)}%`} sub="Watermark bit recovery rate" />
         <MetricCard label="Bit Error Rate" value={ber.toFixed(4)} sub="BER (lower = better integrity)" />
-        <MetricCard label="Regions Flagged" value={String(tamperedRegions.length)} sub={tampered ? 'Areas of concern localized' : 'No regions flagged'} danger={tampered && tamperedRegions.length > 0} />
+        <MetricCard
+          label="Regions Flagged"
+          value={String(heatmapRegions.length)}
+          sub={activeFrame
+            ? `In frame ${activeFrame.frame}`
+            : (tampered ? 'Areas of concern localized' : 'No regions flagged')}
+          danger={heatmapRegions.length > 0}
+        />
         <MetricCard label="Media Type" value={fileType === 'video' ? 'Video' : 'Image'} sub="Analyzed file format container" />
       </div>
 
@@ -163,15 +181,19 @@ export default function Results({ result, navigate }: ResultsProps) {
             <div className="flex flex-wrap gap-2 mb-6">
               {frameResults.map(f => {
                 const isT = f.status === 'tampered'
+                const isActive = (activeFrame?.frame ?? frameResults[0]?.frame) === f.frame
                 return (
-                  <div key={f.frame}
-                    title={`Frame ${f.frame}: ${f.status.toUpperCase()} (${(f.confidence * 100).toFixed(0)}%)`}
+                  <button key={f.frame}
+                    type="button"
+                    onClick={() => setSelectedFrame(f.frame)}
+                    title={`Frame ${f.frame}: ${f.status.toUpperCase()} (${(f.confidence * 100).toFixed(0)}%) — click to view spatial map`}
                     className={`w-12 h-12 rounded-xl flex items-center justify-center text-[12px] font-mono font-bold cursor-pointer transition-all duration-300 hover:scale-110 hover:-translate-y-1
-                      ${isT 
-                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:shadow-[0_0_15px_rgba(244,63,94,0.3)] hover:bg-rose-500/20' 
-                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:bg-emerald-500/20'}`}>
+                      ${isT
+                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:shadow-[0_0_15px_rgba(244,63,94,0.3)] hover:bg-rose-500/20'
+                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:bg-emerald-500/20'}
+                      ${isActive ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-[#111318] scale-110' : ''}`}>
                     {f.frame}
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -190,7 +212,11 @@ export default function Results({ result, navigate }: ResultsProps) {
           <Icon icon="lucide:activity" className="text-cyan-400" width="24" />
           <div>
             <h2 className="text-[22px] font-medium text-white leading-none mb-1">Signal Attention Map</h2>
-            <p className="text-slate-400 text-[14px]">Regions where the neural watermark signal was disrupted</p>
+            <p className="text-slate-400 text-[14px]">
+              {activeFrame
+                ? `Frame ${activeFrame.frame} · ${activeFrame.status === 'tampered' ? 'tampered' : 'authentic'} · click any frame above to switch`
+                : 'Regions where the neural watermark signal was disrupted'}
+            </p>
           </div>
         </div>
 
@@ -203,8 +229,8 @@ export default function Results({ result, navigate }: ResultsProps) {
               const ROWS = 32
               // Fallback: if backend didn't send image dimensions, assume square sized
               // by the largest tampered-region extent. Avoids false aspect-ratio distortion.
-              const fallbackMax = tamperedRegions.length > 0
-                ? Math.max(...tamperedRegions.flatMap(r => [r.x + r.w, r.y + r.h]))
+              const fallbackMax = heatmapRegions.length > 0
+                ? Math.max(...heatmapRegions.flatMap(r => [r.x + r.w, r.y + r.h]))
                 : 320
               const maxX = imageWidth  ?? fallbackMax
               const maxY = imageHeight ?? fallbackMax
@@ -217,7 +243,7 @@ export default function Results({ result, navigate }: ResultsProps) {
                 const cellY    = (row / ROWS) * maxY
                 const cellYEnd = ((row + 1) / ROWS) * maxY
 
-                const hits = tamperedRegions.filter(r =>
+                const hits = heatmapRegions.filter(r =>
                   r.x < cellXEnd && (r.x + r.w) > cellX &&
                   r.y < cellYEnd && (r.y + r.h) > cellY
                 ).length

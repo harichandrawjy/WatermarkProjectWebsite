@@ -16,6 +16,7 @@ export interface FrameResult {
   frame: number
   status: 'tampered' | 'authentic'
   confidence: number
+  tamperedRegions?: TamperedRegion[]
 }
 
 export interface AnalysisResult {
