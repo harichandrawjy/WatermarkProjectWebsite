@@ -7,7 +7,7 @@ interface VerifyProps {
 }
 
 type Stage = 'idle' | 'dragging' | 'preview' | 'verifying' | 'error'
-type MetaSource = 'last' | 'id' | 'file'
+type MetaSource = 'auto' | 'last' | 'id' | 'file'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
@@ -37,17 +37,61 @@ export default function Verify({ onComplete }: VerifyProps) {
   const [preview,      setPreview]      = useState<string | null>(null)
   const [stepIdx,      setStepIdx]      = useState(0)
   const [progress,     setProgress]     = useState(0)
-  const [metaSource,   setMetaSource]   = useState<MetaSource>('last')
+  const [metaSource,   setMetaSource]   = useState<MetaSource>('auto')
   const [manualId,     setManualId]     = useState('')
   const [metaFile,     setMetaFile]     = useState<File | null>(null)
   const [lastId,       setLastId]       = useState<string | null>(null)
   const [errorMsg,     setErrorMsg]     = useState('')
+  const [metaInfo,     setMetaInfo]     = useState<{ owner: string; mediaId: string } | null>(null)
+  const [autoMeta,     setAutoMeta]     = useState<string | null>(null)
+  const [autoLooking,  setAutoLooking]  = useState(false)
+  const [autoFound,    setAutoFound]    = useState<boolean | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const metaInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setLastId(localStorage.getItem('wm_last_id'))
   }, [])
+
+  // Pull owner + media id out of whichever metadata source the user picked,
+  // so we can surface them before they click Verify.
+  useEffect(() => {
+    const extract = (raw: string): { owner: string; mediaId: string } | null => {
+      try {
+        const obj = JSON.parse(raw) as Record<string, unknown>
+        const pick = (...keys: string[]) => {
+          for (const k of keys) {
+            const v = obj[k]
+            if (typeof v === 'string' && v.trim()) return v
+            if (typeof v === 'number') return String(v)
+          }
+          return ''
+        }
+        return {
+          owner:   pick('owner', 'owner_id', 'ownerId'),
+          mediaId: pick('media', 'media_id', 'mediaId', 'id'),
+        }
+      } catch { return null }
+    }
+
+    let cancelled = false
+    const run = async () => {
+      if (metaSource === 'file') {
+        if (!metaFile) { setMetaInfo(null); return }
+        try {
+          const text = await metaFile.text()
+          if (!cancelled) setMetaInfo(extract(text))
+        } catch { if (!cancelled) setMetaInfo(null) }
+        return
+      }
+      const id = metaSource === 'id' ? manualId.trim() : (lastId ?? '')
+      if (!id) { setMetaInfo(null); return }
+      const raw = localStorage.getItem(`wm_meta_${id}`)
+      setMetaInfo(raw ? extract(raw) : null)
+    }
+    run()
+    return () => { cancelled = true }
+  }, [metaSource, manualId, metaFile, lastId])
 
   // Animate the step indicator while the request is in-flight.
   useEffect(() => {
@@ -68,12 +112,48 @@ export default function Verify({ onComplete }: VerifyProps) {
     setFile(f)
     setPreview(URL.createObjectURL(f))
     setStage('preview')
+    if (metaSource === 'auto') lookupFromDb(f)
+  }
+
+  useEffect(() => {
+    if (metaSource === 'auto' && file) lookupFromDb(file)
+  }, [metaSource])
+
+  const lookupFromDb = async (f: File) => {
+    setAutoLooking(true)
+    setAutoFound(null)
+    setAutoMeta(null)
+    setMetaInfo(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', f)
+      const res = await fetch(`${API_BASE}/lookup`, { method: 'POST', body: fd })
+      if (!res.ok) throw new Error('not found')
+      const data = await res.json() as { metadata: Record<string, unknown>; owner?: string; media?: string }
+      const metaStr = JSON.stringify(data.metadata)
+      setAutoMeta(metaStr)
+      setAutoFound(true)
+      setMetaInfo({
+        owner: data.owner ?? (data.metadata.owner as string) ?? '',
+        mediaId: data.media ?? (data.metadata.media as string) ?? '',
+      })
+    } catch {
+      setAutoFound(false)
+      setAutoMeta(null)
+    } finally {
+      setAutoLooking(false)
+    }
   }
 
   const onDrop     = useCallback((e: React.DragEvent) => { e.preventDefault(); setStage('idle'); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }, [])
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setStage('dragging') }
 
   const resolveMetadata = async (): Promise<string> => {
+    if (metaSource === 'auto') {
+      if (autoLooking) throw new Error('Still searching database, please wait...')
+      if (!autoMeta) throw new Error('No matching record found in database. Try manual options instead.')
+      return autoMeta
+    }
     if (metaSource === 'file') {
       if (!metaFile) throw new Error('Please attach a metadata.json file.')
       const text = await metaFile.text()
@@ -130,6 +210,8 @@ export default function Verify({ onComplete }: VerifyProps) {
         frameTamperRate: raw.frameTamperRate,
         imageWidth: raw.imageWidth,
         imageHeight: raw.imageHeight,
+        ownerId: raw.ownerId ?? metaInfo?.owner,
+        mediaId: raw.mediaId ?? metaInfo?.mediaId,
       }
       setProgress(100)
       setStepIdx(VERIFY_STEPS.length - 1)
@@ -143,6 +225,7 @@ export default function Verify({ onComplete }: VerifyProps) {
   const reset = () => {
     setFile(null); setPreview(null); setStage('idle')
     setProgress(0); setStepIdx(0); setErrorMsg('')
+    setAutoMeta(null); setAutoFound(null); setAutoLooking(false)
   }
 
   return (
@@ -276,9 +359,10 @@ export default function Verify({ onComplete }: VerifyProps) {
                 <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 block">Encode Metadata Source</label>
                 <div className="flex gap-2 flex-wrap mb-4">
                   {[
-                    { k: 'last' as const, label: 'Last encoded', disabled: !lastId },
-                    { k: 'id'   as const, label: 'Specific ID',  disabled: false },
-                    { k: 'file' as const, label: 'Upload JSON',  disabled: false },
+                    { k: 'auto' as const, label: 'Auto (Database)', disabled: false },
+                    { k: 'last' as const, label: 'Last encoded',    disabled: !lastId },
+                    { k: 'id'   as const, label: 'Specific ID',     disabled: false },
+                    { k: 'file' as const, label: 'Upload JSON',     disabled: false },
                   ].map(o => (
                     <button
                       key={o.k}
@@ -294,6 +378,40 @@ export default function Verify({ onComplete }: VerifyProps) {
                     </button>
                   ))}
                 </div>
+
+                {metaSource === 'auto' && (
+                  <div className="text-[12.5px]">
+                    {autoLooking ? (
+                      <p className="text-amber-400 flex items-center gap-2">
+                        <Icon icon="lucide:loader-2" width="14" className="animate-spin" />
+                        Searching database for matching record...
+                      </p>
+                    ) : autoFound === true ? (
+                      <div className="px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start gap-3">
+                        <Icon icon="lucide:database" width="16" className="text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-emerald-400 font-medium mb-1">Record found in database</p>
+                          {metaInfo && (
+                            <p className="text-slate-400">
+                              Owner: <span className="text-white font-mono">{metaInfo.owner || '—'}</span>
+                              {' · '}Media ID: <span className="text-white font-mono">{metaInfo.mediaId || '—'}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ) : autoFound === false ? (
+                      <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
+                        <Icon icon="lucide:alert-triangle" width="16" className="text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-amber-400 font-medium mb-1">No matching record found</p>
+                          <p className="text-slate-400">This file may not be in the database. Try <strong className="text-white">Specific ID</strong> or <strong className="text-white">Upload JSON</strong> instead.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-slate-400">Upload a file above — we'll automatically search the database for its metadata.</p>
+                    )}
+                  </div>
+                )}
 
                 {metaSource === 'last' && (
                   <p className="text-[12.5px] text-slate-400">
@@ -331,6 +449,7 @@ export default function Verify({ onComplete }: VerifyProps) {
                     </button>
                   </div>
                 )}
+
               </div>
 
               {/* Warning */}

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { Page } from '../App'
 import { Icon } from '@iconify/react'
+import { useAuth } from '../context/auth'
 
 interface EncodeProps {
   navigate: (p: Page) => void
@@ -29,6 +30,7 @@ interface EncodeResponse {
 }
 
 export default function Encode({ navigate }: EncodeProps) {
+  const { user, token, loading: authLoading } = useAuth()
   const [stage,       setStage]      = useState<Stage>('idle')
   const [file,        setFile]       = useState<File | null>(null)
   const [preview,     setPreview]    = useState<string | null>(null)
@@ -36,7 +38,6 @@ export default function Encode({ navigate }: EncodeProps) {
   const [progress,    setProgress]   = useState(0)
   const [wmPreview,   setWmPreview]  = useState<string | null>(null)
   const [psnr,        setPsnr]       = useState(0)
-  const [owner,       setOwner]      = useState('')
   const [mediaId,     setMediaId]    = useState('')
   const [encodedId,   setEncodedId]  = useState<string | null>(null)
   const [encodedKind, setEncodedKind] = useState<'image' | 'video'>('image')
@@ -69,8 +70,12 @@ export default function Encode({ navigate }: EncodeProps) {
 
   const startEncoding = async () => {
     if (!file) return
-    if (!owner.trim() || !mediaId.trim()) {
-      setErrorMsg('Owner and Media ID are required.')
+    if (!token) {
+      setErrorMsg('You must be signed in to encode.')
+      return
+    }
+    if (!mediaId.trim()) {
+      setErrorMsg('Media ID is required.')
       return
     }
     setErrorMsg('')
@@ -79,10 +84,13 @@ export default function Encode({ navigate }: EncodeProps) {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      fd.append('owner', owner.trim())
       fd.append('media_id', mediaId.trim())
 
-      const res = await fetch(`${API_BASE}/encode`, { method: 'POST', body: fd })
+      const res = await fetch(`${API_BASE}/encode`, {
+        method:  'POST',
+        body:    fd,
+        headers: { Authorization: `Bearer ${token}` },
+      })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
         throw new Error(`Server returned ${res.status}: ${text || res.statusText}`)
@@ -134,6 +142,41 @@ export default function Encode({ navigate }: EncodeProps) {
     setFile(null); setPreview(null); setWmPreview(null)
     setStage('idle'); setProgress(0); setStepIdx(0); setPsnr(0)
     setEncodedId(null); setErrorMsg('')
+  }
+
+  // Sign-in gate: encode now requires an authenticated user so we can tie
+  // the watermark to a real account instead of a free-text owner string.
+  if (authLoading) {
+    return (
+      <div className="max-w-md mx-auto px-7 pt-24 pb-32 text-center text-slate-500 flex items-center justify-center gap-3">
+        <Icon icon="lucide:loader-2" width="18" className="animate-spin" /> Loading...
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-md mx-auto px-7 pt-24 pb-32 text-center relative z-10">
+        <div className="absolute top-[10%] left-[20%] w-[60%] h-[40%] bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
+        <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto mb-6">
+          <Icon icon="lucide:lock" width="28" />
+        </div>
+        <h1 className="font-display text-[1.8rem] text-white font-medium mb-3">Sign in to encode</h1>
+        <p className="text-slate-400 text-[14.5px] mb-8 leading-relaxed">
+          Encoding ties each watermark to your account so ownership can be verified later.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button onClick={() => navigate('login')}
+            className="px-6 py-3 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 transition-all text-[14px] flex items-center gap-2">
+            <Icon icon="lucide:log-in" width="16" /> Sign In
+          </button>
+          <button onClick={() => navigate('register')}
+            className="px-6 py-3 bg-white/5 border border-white/10 text-white font-medium rounded-xl hover:bg-white/10 transition-all text-[14px] flex items-center gap-2">
+            <Icon icon="lucide:user-plus" width="16" /> Create Account
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -343,17 +386,14 @@ export default function Encode({ navigate }: EncodeProps) {
                 )}
               </div>
 
-              {/* Owner / Media ID inputs */}
+              {/* Owner (from auth) + Media ID */}
               <div className="p-6 border-b border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Owner</label>
-                  <input
-                    type="text"
-                    value={owner}
-                    onChange={e => setOwner(e.target.value)}
-                    placeholder="e.g. alice@studio.com"
-                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 transition-colors"
-                  />
+                  <div className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-4 py-3 text-[14px] text-slate-300 flex items-center gap-2">
+                    <Icon icon="lucide:lock" width="14" className="text-cyan-400" />
+                    <span className="font-mono truncate">{user?.email ?? '—'}</span>
+                  </div>
                 </div>
                 <div>
                   <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Media ID</label>

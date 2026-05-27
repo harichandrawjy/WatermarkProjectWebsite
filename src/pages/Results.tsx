@@ -52,8 +52,13 @@ export default function Results({ result, navigate }: ResultsProps) {
     </div>
   )
 
-  const { status, confidence, wmAccuracy, ber, tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight } = result
+  const { status, confidence, wmAccuracy, ber, tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight,
+          watermarkFound, ownerMatch, mediaMatch, ownerId, mediaId } = result
   const tampered = status === 'tampered'
+
+  // If the backend didn't explicitly say, infer "found" from whether we have any
+  // ID to show or whether the watermark accuracy crossed a sane threshold.
+  const wmFound = watermarkFound ?? (wmAccuracy >= 0.5 || Boolean(ownerId || mediaId))
 
   // For video, the spatial heatmap reflects whichever frame is selected;
   // image results use the single top-level tamperedRegions array.
@@ -118,6 +123,89 @@ export default function Results({ result, navigate }: ResultsProps) {
         />
         <MetricCard label="Media Type" value={fileType === 'video' ? 'Video' : 'Image'} sub="Analyzed file format container" />
       </div>
+
+      {/* Watermark Identity */}
+      <section className="mb-16">
+        <div className="flex items-center gap-3 mb-6">
+          <Icon icon="lucide:fingerprint" className={wmFound ? 'text-cyan-400' : 'text-rose-400'} width="24" />
+          <div>
+            <h2 className="text-[22px] font-medium text-white leading-none mb-1">Watermark Identity</h2>
+            <p className="text-slate-400 text-[14px]">
+              {wmFound
+                ? 'Embedded ownership signature recovered from the media'
+                : 'No recoverable watermark signature was found in this file'}
+            </p>
+          </div>
+        </div>
+
+        <div className={`bg-[#111318] border rounded-3xl p-8 shadow-xl
+          ${wmFound ? 'border-cyan-500/20' : 'border-rose-500/30'}`}>
+
+          {/* Top status pill */}
+          <div className="flex items-center gap-3 mb-6">
+            <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-bold tracking-widest uppercase border
+              ${wmFound
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                : 'bg-rose-500/10 text-rose-400 border-rose-500/30'}`}>
+              <Icon icon={wmFound ? 'lucide:check-circle-2' : 'lucide:x-circle'} width="14" />
+              {wmFound ? 'Media ID and Owner ID Found' : 'Media ID and Owner ID Not Found'}
+            </span>
+          </div>
+
+          {wmFound ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Media ID */}
+              <div className="px-5 py-4 bg-white/[0.02] border border-white/10 rounded-2xl">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
+                    <Icon icon="lucide:hash" width="12" /> Media ID
+                  </span>
+                  {typeof mediaMatch === 'boolean' && (
+                    <span className={`text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-md border
+                      ${mediaMatch
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : 'bg-rose-500/10 text-rose-400 border-rose-500/30'}`}>
+                      {mediaMatch ? 'Match' : 'Mismatch'}
+                    </span>
+                  )}
+                </div>
+                <p className="font-mono text-[15px] text-rose-300 break-all">
+                  {mediaId || <span className="text-slate-600">— not provided —</span>}
+                </p>
+              </div>
+
+              {/* Owner ID */}
+              <div className="px-5 py-4 bg-white/[0.02] border border-white/10 rounded-2xl">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
+                    <Icon icon="lucide:user" width="12" /> Owner ID
+                  </span>
+                  {typeof ownerMatch === 'boolean' && (
+                    <span className={`text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-md border
+                      ${ownerMatch
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : 'bg-rose-500/10 text-rose-400 border-rose-500/30'}`}>
+                      {ownerMatch ? 'Match' : 'Mismatch'}
+                    </span>
+                  )}
+                </div>
+                <p className="font-mono text-[15px] text-cyan-300 break-all">
+                  {ownerId || <span className="text-slate-600">— not provided —</span>}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 px-5 py-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl">
+              <Icon icon="lucide:alert-triangle" className="text-rose-400 shrink-0 mt-0.5" width="18" />
+              <p className="text-[13.5px] text-slate-300 leading-relaxed">
+                The decoder could not recover a valid watermark payload. This usually means the file
+                was never protected with our Encode pipeline, or the watermark was destroyed by
+                heavy re-encoding or cropping.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Tampered Regions Table */}
       {tampered && tamperedRegions.length > 0 && (
