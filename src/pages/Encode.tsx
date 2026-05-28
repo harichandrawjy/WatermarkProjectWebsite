@@ -30,7 +30,7 @@ interface EncodeResponse {
 }
 
 export default function Encode({ navigate }: EncodeProps) {
-  const { user, token, loading: authLoading } = useAuth()
+  const { user, token, loading: authLoading, authedFetch } = useAuth()
   const [stage,       setStage]      = useState<Stage>('idle')
   const [file,        setFile]       = useState<File | null>(null)
   const [preview,     setPreview]    = useState<string | null>(null)
@@ -86,10 +86,9 @@ export default function Encode({ navigate }: EncodeProps) {
       fd.append('file', file)
       fd.append('media_id', mediaId.trim())
 
-      const res = await fetch(`${API_BASE}/encode`, {
-        method:  'POST',
-        body:    fd,
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await authedFetch(`${API_BASE}/encode`, {
+        method: 'POST',
+        body:   fd,
       })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
