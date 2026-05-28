@@ -19,16 +19,14 @@ interface MediaItem {
 }
 
 export default function Dashboard({ navigate }: DashboardProps) {
-  const { user, token, logout } = useAuth()
+  const { user, token, logout, authedFetch } = useAuth()
   const [items, setItems] = useState<MediaItem[] | null>(null)
   const [err,   setErr]   = useState('')
 
   useEffect(() => {
     if (!token) return
     let cancelled = false
-    fetch(`${API_BASE}/me/media`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    authedFetch(`${API_BASE}/me/media`)
       .then(async r => {
         if (!r.ok) {
           const text = await r.text().catch(() => '')
