@@ -1,13 +1,22 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import type { AnalysisResult } from '../App'
 import { Icon } from '@iconify/react'
+import { useAuth } from '../context/auth'
 
 interface VerifyProps {
   onComplete: (r: AnalysisResult) => void
 }
 
 type Stage = 'idle' | 'dragging' | 'preview' | 'verifying' | 'error'
-type MetaSource = 'auto' | 'last' | 'id' | 'file'
+type MetaSource = 'auto' | 'id' | 'file'
+
+interface HistoryItem {
+  id:          string
+  media:       string | null
+  kind:        'image' | 'video'
+  created_at?: string
+  metadata:    Record<string, unknown>
+}
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
@@ -32,6 +41,7 @@ const DETECT_ITEMS = [
 ]
 
 export default function Verify({ onComplete }: VerifyProps) {
+  const { token, authedFetch } = useAuth()
   const [stage,        setStage]        = useState<Stage>('idle')
   const [file,         setFile]         = useState<File | null>(null)
   const [preview,      setPreview]      = useState<string | null>(null)
@@ -40,18 +50,38 @@ export default function Verify({ onComplete }: VerifyProps) {
   const [metaSource,   setMetaSource]   = useState<MetaSource>('auto')
   const [manualId,     setManualId]     = useState('')
   const [metaFile,     setMetaFile]     = useState<File | null>(null)
-  const [lastId,       setLastId]       = useState<string | null>(null)
   const [errorMsg,     setErrorMsg]     = useState('')
   const [metaInfo,     setMetaInfo]     = useState<{ owner: string; mediaId: string } | null>(null)
   const [autoMeta,     setAutoMeta]     = useState<string | null>(null)
   const [autoLooking,  setAutoLooking]  = useState(false)
   const [autoFound,    setAutoFound]    = useState<boolean | null>(null)
+  const [history,      setHistory]      = useState<HistoryItem[]>([])
+  const [historyOpen,  setHistoryOpen]  = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const metaInputRef = useRef<HTMLInputElement>(null)
 
+  // Pull the user's encode history once they're logged in.  Used to power
+  // the "Specific ID / History" combobox so they can search past encodes
+  // by media_id and pick from the list — no need to remember the raw ID.
   useEffect(() => {
-    setLastId(localStorage.getItem('wm_last_id'))
-  }, [])
+    if (!token) { setHistory([]); return }
+    let cancelled = false
+    authedFetch(`${API_BASE}/me/media`)
+      .then(r => r.ok ? r.json() as Promise<{ items: HistoryItem[] }> : null)
+      .then(d => { if (!cancelled && d) setHistory(d.items ?? []) })
+      .catch(() => { /* silent — history is best-effort */ })
+    return () => { cancelled = true }
+  }, [token])
+
+  // Filtered list shown below the input — newest first, capped at 20 rows.
+  const filteredHistory = useMemo(() => {
+    const q = manualId.trim().toLowerCase()
+    if (!q) return history.slice(0, 20)
+    return history.filter(h =>
+      h.id.toLowerCase().includes(q) ||
+      (h.media ?? '').toLowerCase().includes(q)
+    ).slice(0, 20)
+  }, [history, manualId])
 
   // Pull owner + media id out of whichever metadata source the user picked,
   // so we can surface them before they click Verify.
@@ -84,14 +114,19 @@ export default function Verify({ onComplete }: VerifyProps) {
         } catch { if (!cancelled) setMetaInfo(null) }
         return
       }
-      const id = metaSource === 'id' ? manualId.trim() : (lastId ?? '')
+      if (metaSource !== 'id') { setMetaInfo(null); return }
+      const id = manualId.trim()
       if (!id) { setMetaInfo(null); return }
+      // Prefer the in-memory server history (covers cross-device encodes),
+      // fall back to localStorage (covers offline / different browser).
+      const fromHistory = history.find(h => h.id === id)
+      if (fromHistory) { setMetaInfo(extract(JSON.stringify(fromHistory.metadata))); return }
       const raw = localStorage.getItem(`wm_meta_${id}`)
       setMetaInfo(raw ? extract(raw) : null)
     }
     run()
     return () => { cancelled = true }
-  }, [metaSource, manualId, metaFile, lastId])
+  }, [metaSource, manualId, metaFile, history])
 
   // Real elapsed-time tick + step-label hint cycle while the request is
   // in-flight.  `progress` now stores elapsed seconds (not a fake percent).
@@ -165,10 +200,11 @@ export default function Verify({ onComplete }: VerifyProps) {
       JSON.parse(text)
       return text
     }
-    const id = metaSource === 'id' ? manualId.trim() : (lastId ?? '')
-    if (!id) throw new Error(metaSource === 'id'
-      ? 'Enter the encode ID.'
-      : 'No previous encode found in this browser. Encode a file first or attach metadata.json.')
+    // metaSource === 'id' — either picked from history, or pasted directly.
+    const id = manualId.trim()
+    if (!id) throw new Error('Pick an entry from your history or paste an encode ID.')
+    const fromHistory = history.find(h => h.id === id)
+    if (fromHistory) return JSON.stringify(fromHistory.metadata)
     const raw = localStorage.getItem(`wm_meta_${id}`)
     if (!raw) throw new Error(`No metadata stored for ID "${id}". Try the file fallback.`)
     return raw
@@ -373,10 +409,9 @@ export default function Verify({ onComplete }: VerifyProps) {
                 <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 block">Encode Metadata Source</label>
                 <div className="flex gap-2 flex-wrap mb-4">
                   {[
-                    { k: 'auto' as const, label: 'Auto (Database)', disabled: false },
-                    { k: 'last' as const, label: 'Last encoded',    disabled: !lastId },
-                    { k: 'id'   as const, label: 'Specific ID',     disabled: false },
-                    { k: 'file' as const, label: 'Upload JSON',     disabled: false },
+                    { k: 'auto' as const, label: 'Auto (Database)',     disabled: false },
+                    { k: 'id'   as const, label: 'Specific ID / History', disabled: false },
+                    { k: 'file' as const, label: 'Upload JSON',         disabled: false },
                   ].map(o => (
                     <button
                       key={o.k}
@@ -427,22 +462,67 @@ export default function Verify({ onComplete }: VerifyProps) {
                   </div>
                 )}
 
-                {metaSource === 'last' && (
-                  <p className="text-[12.5px] text-slate-400">
-                    {lastId
-                      ? <>Using <span className="font-mono text-cyan-400">{lastId}</span> from this browser's last encode.</>
-                      : <>No previous encode found here. Switch to <strong className="text-white">Specific ID</strong> or <strong className="text-white">Upload JSON</strong>.</>}
-                  </p>
-                )}
-
                 {metaSource === 'id' && (
-                  <input
-                    type="text"
-                    value={manualId}
-                    onChange={e => setManualId(e.target.value)}
-                    placeholder="Encode ID (e.g. abc123)"
-                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white placeholder-slate-600 focus:outline-none focus:border-rose-500/50 transition-colors font-mono"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={manualId}
+                      onChange={e => { setManualId(e.target.value); setHistoryOpen(true) }}
+                      onFocus={() => setHistoryOpen(true)}
+                      onBlur={() => setTimeout(() => setHistoryOpen(false), 150)}
+                      placeholder={token
+                        ? 'Search your encode history or paste an ID...'
+                        : 'Encode ID (e.g. abc123)'}
+                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white placeholder-slate-600 focus:outline-none focus:border-rose-500/50 transition-colors font-mono"
+                    />
+
+                    {/* Searchable history dropdown — only when logged in and
+                        there's something to show.  Click an item to fill the
+                        input with its encode ID. */}
+                    {historyOpen && token && filteredHistory.length > 0 && (
+                      <ul className="absolute z-20 left-0 right-0 mt-2 bg-[#0a0a0c]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-auto max-h-[280px] scrollbar-dark">
+                        {filteredHistory.map(h => {
+                          const selected = manualId.trim() === h.id
+                          return (
+                            <li
+                              key={h.id}
+                              onMouseDown={e => {
+                                e.preventDefault()        // keep focus on input
+                                setManualId(h.id)
+                                setHistoryOpen(false)
+                              }}
+                              className={`px-4 py-3 cursor-pointer flex items-center gap-3 border-b border-white/5 last:border-b-0 transition-colors
+                                ${selected ? 'bg-rose-500/10' : 'hover:bg-white/[0.04]'}`}>
+                              <Icon icon={h.kind === 'video' ? 'lucide:video' : 'lucide:image'}
+                                    width="16"
+                                    className="text-cyan-400 shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-[13px] text-white truncate font-medium">
+                                  {h.media || <span className="text-slate-500">— no media id —</span>}
+                                </div>
+                                <div className="text-[11px] text-slate-500 font-mono truncate">
+                                  {h.id}{h.created_at ? ` · ${new Date(h.created_at).toLocaleDateString()}` : ''}
+                                </div>
+                              </div>
+                              {selected && <Icon icon="lucide:check" width="14" className="text-rose-400 shrink-0" />}
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+
+                    {token && history.length === 0 && (
+                      <p className="mt-2 text-[11.5px] text-slate-500">
+                        Your encode history is empty — paste an encode ID directly.
+                      </p>
+                    )}
+
+                    {!token && (
+                      <p className="mt-2 text-[11.5px] text-slate-500">
+                        Sign in to browse your encode history, or paste an ID directly.
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {metaSource === 'file' && (
