@@ -177,7 +177,7 @@ export default function Home({ navigate }: HomeProps) {
                 <h3 className="font-display text-[1.4rem] text-white font-normal mb-2">Encode Watermark</h3>
                 <p className="text-slate-400 text-[14px] leading-relaxed">
                   Upload your original image or video. We embed an invisible semi-fragile watermark
-                  using the HIDDeN encoder. Download the protected file and share it freely.
+                  using a LWT + DCT + SVD + QIM pipeline. Download the protected file and share it freely.
                 </p>
               </div>
               <ul className="relative z-10 flex flex-col gap-3 mt-auto pt-4">
@@ -235,9 +235,9 @@ export default function Home({ navigate }: HomeProps) {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               { n: '01', title: 'Upload original',   desc: 'Clean, unmodified media' },
-              { n: '02', title: 'Embed watermark',   desc: 'HIDDeN encoder + noise layer' },
-              { n: '03', title: 'Detect tampering',  desc: 'Decoder checks integrity' },
-              { n: '04', title: 'Localize changes',  desc: 'EfficientNet-B4 + ViT output' },
+              { n: '02', title: 'Embed watermark',   desc: 'LWT + DCT + SVD with QIM' },
+              { n: '03', title: 'Detect tampering',  desc: 'QIM detector + BCH(15,7) decode' },
+              { n: '04', title: 'Localize changes',  desc: 'Per-sub-block SHA-256 parity check' },
             ].map((s, i) => (
               <div key={i} className="text-center relative group">
                 <div className="w-16 h-16 bg-[#111318] border border-white/10 text-white rounded-2xl flex items-center justify-center font-display text-xl mx-auto mb-5 group-hover:border-cyan-500/50 group-hover:shadow-[0_0_20px_rgba(34,211,238,0.2)] transition-all">

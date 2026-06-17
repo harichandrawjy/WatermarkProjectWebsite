@@ -13,13 +13,13 @@ const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 const VERIFY_STEPS = [
   'Reading watermarked file...',
-  'Extracting watermark bits...',
-  'Running HIDDeN decoder...',
-  'Comparing against reference...',
-  'Computing BER per region...',
-  'Running EfficientNet-B4 + ViT...',
-  'Localizing tampered regions...',
-  'Generating report...',
+  'Applying LWT + 8x8 DCT + SVD...',
+  'Extracting bits via QIM detector...',
+  'Decoding BCH(15,7) + majority vote...',
+  'Matching owner / media / frame IDs...',
+  'Regenerating SHA-256 parity per sub-block...',
+  'Comparing parities, locating mismatches...',
+  'Generating integrity report...',
 ]
 
 const DETECT_ITEMS = [
@@ -210,8 +210,15 @@ export default function Verify({ onComplete }: VerifyProps) {
         frameTamperRate: raw.frameTamperRate,
         imageWidth: raw.imageWidth,
         imageHeight: raw.imageHeight,
+        missingFrames: raw.missingFrames,
+        framesDeleted: raw.framesDeleted,
+        reordered: raw.reordered,
+        duplicateFrames: raw.duplicateFrames,
+        framesTruncated: raw.framesTruncated,
         ownerId: raw.ownerId ?? metaInfo?.owner,
         mediaId: raw.mediaId ?? metaInfo?.mediaId,
+        watermarkOriginal: raw.watermarkOriginal,
+        watermarkExtracted: raw.watermarkExtracted,
       }
       setProgress(100)
       setStepIdx(VERIFY_STEPS.length - 1)
@@ -242,8 +249,8 @@ export default function Verify({ onComplete }: VerifyProps) {
         </div>
         <h1 className="font-display text-[clamp(2.2rem,5vw,3.4rem)] text-white font-normal mb-4 leading-tight tracking-tight">Verify Integrity</h1>
         <p className="text-slate-400 text-[1.05rem] max-w-lg mx-auto leading-relaxed">
-          Upload your watermarked image or video. We'll extract the neural signal to detect
-          exactly where and when any malicious tampering occurred.
+          Upload your watermarked image or video. We'll extract the embedded payload and
+          compare per-sub-block parity to detect exactly where and when any malicious tampering occurred.
         </p>
       </div>
 
@@ -539,7 +546,7 @@ export default function Verify({ onComplete }: VerifyProps) {
                 { icon: 'lucide:badge-check', text: 'Authentic / Tampered verdict with confidence score' },
                 { icon: 'lucide:map-pin', text: 'Exact spatial pixel regions that were altered' },
                 { icon: 'lucide:film', text: 'Per-frame timeline analysis for video files' },
-                { icon: 'lucide:activity', text: 'Visual attention heatmap of watermark signal' },
+                { icon: 'lucide:activity', text: 'Visual sub-block parity mismatch heatmap' },
                 { icon: 'lucide:download-cloud', text: 'Downloadable structured JSON report' },
               ].map((item, i) => (
                 <li key={i} className="flex items-start gap-3 text-[13px] text-slate-400 leading-relaxed">

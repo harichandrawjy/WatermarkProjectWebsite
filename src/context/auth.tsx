@@ -1,9 +1,16 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
-const TOKEN_KEY   = 'wm_token'
-const REFRESH_KEY = 'wm_refresh'
-const USER_KEY    = 'wm_user'
+const TOKEN_KEY    = 'wm_token'
+const REFRESH_KEY  = 'wm_refresh'
+const USER_KEY     = 'wm_user'
+const ACTIVITY_KEY = 'wm_last_activity'
+
+// Auto-logout after this many ms of no user activity. Change here to tune.
+// Activity = click, keypress, scroll, touch — *not* mouse-move (too noisy).
+// The deadline is persisted to localStorage, so closing the tab and coming
+// back later still logs the user out if too much time has passed.
+const IDLE_LIMIT_MS = 15 * 60 * 1000   // 15 minutes
 
 export interface AuthUser {
   id:    string
@@ -47,10 +54,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(REFRESH_KEY)
     localStorage.removeItem(USER_KEY)
+    localStorage.removeItem(ACTIVITY_KEY)
     tokenRef.current   = null
     refreshRef.current = null
     setToken(null)
     setUser(null)
+  }
+
+  // Stamp "now" as the last activity time. Used both by the persistence
+  // check on mount and by the live idle-timer reset while the tab is open.
+  const stampActivity = () => {
+    localStorage.setItem(ACTIVITY_KEY, String(Date.now()))
   }
 
   // Exchange the stored refresh_token for a fresh access_token. Returns the
@@ -109,25 +123,83 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const run = async () => {
       const fromHash = await consumeHashToken()
-      if (!fromHash) {
+      if (fromHash) {
+        stampActivity()
+      } else {
         const t  = localStorage.getItem(TOKEN_KEY)
         const rt = localStorage.getItem(REFRESH_KEY)
         const u  = localStorage.getItem(USER_KEY)
-        if (t && u) {
+        const lastActivity = Number(localStorage.getItem(ACTIVITY_KEY) ?? 0)
+
+        // Idle-too-long guard: if the stored deadline has passed (e.g. the
+        // user closed the tab yesterday and re-opened today), don't restore.
+        const idleTooLong = lastActivity > 0 && (Date.now() - lastActivity) > IDLE_LIMIT_MS
+
+        if (t && u && !idleTooLong) {
           try {
             tokenRef.current   = t
             refreshRef.current = rt
             setToken(t)
             setUser(JSON.parse(u))
+            stampActivity()
           } catch {
             clearSession()
           }
+        } else if (idleTooLong) {
+          clearSession()
         }
       }
       setLoading(false)
     }
     run()
   }, [])
+
+  // Live idle timer: while logged in, watch real user activity (clicks, keys,
+  // scroll, touch — not mouse-move, which would never let the timer fire).
+  // On each event we update the stored timestamp and reset a setTimeout that
+  // calls logout() when it finally elapses without interruption.
+  useEffect(() => {
+    if (!token) return
+
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    const armTimer = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        clearSession()
+      }, IDLE_LIMIT_MS)
+    }
+
+    const onActivity = () => {
+      stampActivity()
+      armTimer()
+    }
+
+    // If the tab was hidden then re-shown, check whether the deadline lapsed
+    // *while we weren't running the timer*. (Background tabs often have their
+    // timers throttled by the browser, so we can't rely on `timer` alone.)
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      const last = Number(localStorage.getItem(ACTIVITY_KEY) ?? 0)
+      if (last > 0 && (Date.now() - last) > IDLE_LIMIT_MS) {
+        clearSession()
+      } else {
+        armTimer()
+      }
+    }
+
+    const events: (keyof WindowEventMap)[] = ['mousedown', 'keydown', 'scroll', 'touchstart']
+    events.forEach(e => window.addEventListener(e, onActivity, { passive: true }))
+    document.addEventListener('visibilitychange', onVisibility)
+
+    armTimer()
+
+    return () => {
+      if (timer) clearTimeout(timer)
+      events.forEach(e => window.removeEventListener(e, onActivity))
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [token])
 
   const login = async (email: string, password: string) => {
     const res = await fetch(`${API_BASE}/auth/login`, {
@@ -145,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user:          AuthUser
     }
     persist(data.access_token, data.refresh_token, data.user)
+    stampActivity()
   }
 
   const register = async (email: string, password: string) => {
@@ -165,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (data.access_token) {
       persist(data.access_token, data.refresh_token, data.user)
+      stampActivity()
       return { needsConfirmation: false }
     }
     return { needsConfirmation: true }

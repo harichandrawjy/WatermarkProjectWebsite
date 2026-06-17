@@ -14,3 +14,33 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+@layer components {
+  /* Slim dark-theme scrollbar with a cyan accent — applied to any container
+     that overflows on the dark panels (Spatial Localization table, etc.). */
+  .scrollbar-dark {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(34, 211, 238, 0.35) transparent;
+  }
+  .scrollbar-dark::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-dark::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+  }
+  .scrollbar-dark::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(34, 211, 238, 0.4), rgba(34, 211, 238, 0.2));
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s;
+  }
+  .scrollbar-dark::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(34, 211, 238, 0.7), rgba(34, 211, 238, 0.4));
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
+  }
+  .scrollbar-dark::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}

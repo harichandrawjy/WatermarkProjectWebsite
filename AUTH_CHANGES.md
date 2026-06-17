@@ -1,6 +1,6 @@
 # User Login & Dashboard — Implementation Summary
 
-Added Supabase-backed authentication to WaterGuard, gated `/encode` behind login, and built a Dashboard for users to retrieve metadata.json files from their past encodes.
+Added Supabase-backed authentication to Aegis, gated `/encode` behind login, and built a Dashboard for users to retrieve metadata.json files from their past encodes.
 
 ## High-level flow
 

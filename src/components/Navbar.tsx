@@ -50,7 +50,7 @@ export default function Navbar({ currentPage, navigate }: NavbarProps) {
               <circle cx="11" cy="11" r="2.5" fill="currentColor"/>
             </svg>
           </span>
-          <span className="tracking-wide">WaterGuard</span>
+          <span className="tracking-wide">Aegis</span>
         </button>
 
         {/* ── Desktop Links ── */}

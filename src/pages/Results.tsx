@@ -53,7 +53,9 @@ export default function Results({ result, navigate }: ResultsProps) {
   )
 
   const { status, confidence, wmAccuracy, ber, tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight,
-          watermarkFound, ownerMatch, mediaMatch, ownerId, mediaId } = result
+          watermarkFound, ownerMatch, mediaMatch, ownerId, mediaId,
+          watermarkOriginal, watermarkExtracted,
+          missingFrames, reordered, duplicateFrames, framesTruncated } = result
   const tampered = status === 'tampered'
 
   // If the backend didn't explicitly say, infer "found" from whether we have any
@@ -68,6 +70,22 @@ export default function Results({ result, navigate }: ResultsProps) {
   const heatmapRegions = activeFrame
     ? (activeFrame.tamperedRegions ?? [])
     : tamperedRegions
+
+  // Fragile-watermark comparison images: for video they come from the
+  // selected frame (every frame carries them); for images they're the single
+  // top-level pair.  Deleted frames have an "original" but nothing extracted.
+  const wmOrig = fileType === 'video' ? activeFrame?.watermarkOriginal : watermarkOriginal
+  const wmExt  = fileType === 'video' ? activeFrame?.watermarkExtracted : watermarkExtracted
+  const activeIsDeleted = fileType === 'video' && activeFrame?.status === 'deleted'
+
+  // Temporal anomalies (video only) — deletions / reorders / truncation that
+  // the decoder localized without cascading across later frames.
+  const hasTemporalAnomaly = fileType === 'video' && (
+    (missingFrames?.length ?? 0) > 0 ||
+    (duplicateFrames?.length ?? 0) > 0 ||
+    Boolean(reordered) ||
+    (framesTruncated ?? 0) > 2
+  )
 
   return (
     <div className="max-w-[1100px] mx-auto px-7 pb-32 relative z-10">
@@ -219,10 +237,12 @@ export default function Results({ result, navigate }: ResultsProps) {
           </div>
           
           <div className="bg-[#111318] border border-white/10 rounded-3xl overflow-hidden shadow-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-[14px] border-collapse min-w-[600px]">
-                <thead>
-                  <tr className="bg-white/[0.02] border-b border-white/10">
+            {/* Scrolls vertically when there are many regions; the thead stays
+                pinned via `sticky top-0` so column headers remain visible. */}
+            <div className="overflow-auto max-h-[375px] scrollbar-dark">
+              <table className="w-full text-[14px] border-collapse min-w-[600px] relative">
+                <thead className="sticky top-0 z-10 bg-[#111318] shadow-[0_1px_0_rgba(255,255,255,0.1)]">
+                  <tr className="bg-white/[0.02]">
                     {['ID','Classification','Coordinates (x, y)','Dimensions (w × h)','Status'].map(h => (
                       <th key={h} className="text-left px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">{h}</th>
                     ))}
@@ -268,19 +288,24 @@ export default function Results({ result, navigate }: ResultsProps) {
           <div className="bg-[#111318] border border-white/10 rounded-3xl p-8 shadow-xl">
             <div className="flex flex-wrap gap-2 mb-6">
               {frameResults.map(f => {
+                const isDeleted = f.status === 'deleted'
                 const isT = f.status === 'tampered'
                 const isActive = (activeFrame?.frame ?? frameResults[0]?.frame) === f.frame
                 return (
                   <button key={f.frame}
                     type="button"
                     onClick={() => setSelectedFrame(f.frame)}
-                    title={`Frame ${f.frame}: ${f.status.toUpperCase()} (${(f.confidence * 100).toFixed(0)}%) — click to view spatial map`}
+                    title={isDeleted
+                      ? `Frame ${f.frame}: DELETED — click to view its expected watermark`
+                      : `Frame ${f.frame}: ${f.status.toUpperCase()} (${(f.confidence * 100).toFixed(0)}%) — click to view spatial map`}
                     className={`w-12 h-12 rounded-xl flex items-center justify-center text-[12px] font-mono font-bold cursor-pointer transition-all duration-300 hover:scale-110 hover:-translate-y-1
-                      ${isT
+                      ${isDeleted
+                        ? 'bg-rose-500/15 text-rose-400 border border-dashed border-rose-500/50 hover:bg-rose-500/25'
+                        : isT
                         ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:shadow-[0_0_15px_rgba(244,63,94,0.3)] hover:bg-rose-500/20'
                         : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:bg-emerald-500/20'}
                       ${isActive ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-[#111318] scale-110' : ''}`}>
-                    {f.frame}
+                    {isDeleted ? <Icon icon="lucide:trash-2" width="16" /> : f.frame}
                   </button>
                 )
               })}
@@ -289,7 +314,124 @@ export default function Results({ result, navigate }: ResultsProps) {
             <div className="flex gap-6 text-[12px] font-bold tracking-widest uppercase text-slate-500 border-t border-white/5 pt-6 mt-2">
               <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-emerald-500/50 border border-emerald-500" /> Authentic Frame</span>
               <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-rose-500/50 border border-rose-500" /> Tampered Frame</span>
+              <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-rose-500/30 border border-dashed border-rose-500" /> Deleted Frame</span>
             </div>
+
+            {/* Temporal integrity — deletions / reorders localized to specific
+                frame_ids without cascading across later frames. */}
+            <div className="border-t border-white/5 pt-6 mt-6">
+              {hasTemporalAnomaly ? (
+                <div className="flex flex-col gap-3">
+                  {(missingFrames?.length ?? 0) > 0 && (
+                    <div className="flex items-start gap-3 px-4 py-3 bg-rose-500/5 border border-rose-500/20 rounded-xl">
+                      <Icon icon="lucide:trash-2" className="text-rose-400 shrink-0 mt-0.5" width="16" />
+                      <p className="text-[13px] text-slate-300">
+                        <strong className="text-rose-400">{missingFrames!.length} frame(s) deleted</strong> — missing
+                        frame ID{missingFrames!.length > 1 ? 's' : ''}:{' '}
+                        <span className="font-mono text-rose-300">{missingFrames!.join(', ')}</span>.
+                        Surviving frames remain authentic (no cascade).
+                      </p>
+                    </div>
+                  )}
+                  {reordered && (
+                    <div className="flex items-start gap-3 px-4 py-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                      <Icon icon="lucide:shuffle" className="text-amber-400 shrink-0 mt-0.5" width="16" />
+                      <p className="text-[13px] text-slate-300">
+                        <strong className="text-amber-400">Frames reordered</strong> — the recovered frame-ID sequence is not monotonic.
+                      </p>
+                    </div>
+                  )}
+                  {(duplicateFrames?.length ?? 0) > 0 && (
+                    <div className="flex items-start gap-3 px-4 py-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                      <Icon icon="lucide:copy" className="text-amber-400 shrink-0 mt-0.5" width="16" />
+                      <p className="text-[13px] text-slate-300">
+                        <strong className="text-amber-400">Duplicate frames (replay)</strong> — frame ID(s):{' '}
+                        <span className="font-mono text-amber-300">{duplicateFrames!.join(', ')}</span>.
+                      </p>
+                    </div>
+                  )}
+                  {(framesTruncated ?? 0) > 2 && (
+                    <div className="flex items-start gap-3 px-4 py-3 bg-rose-500/5 border border-rose-500/20 rounded-xl">
+                      <Icon icon="lucide:scissors" className="text-rose-400 shrink-0 mt-0.5" width="16" />
+                      <p className="text-[13px] text-slate-300">
+                        <strong className="text-rose-400">{framesTruncated} frame(s) truncated</strong> from the end of the clip.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 text-[13px] text-emerald-400">
+                  <Icon icon="lucide:check-circle-2" width="16" />
+                  Temporal integrity intact — no deletion, reorder, or truncation detected.
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Extracted Fragile Watermark — original vs. tampered comparison */}
+      {wmOrig && (wmExt || activeIsDeleted) && (
+        <section className="mb-16">
+          <div className="flex items-center gap-3 mb-6">
+            <Icon icon="lucide:git-compare" className="text-cyan-400" width="24" />
+            <div>
+              <h2 className="text-[22px] font-medium text-white leading-none mb-1">Extracted Watermark</h2>
+              <p className="text-slate-400 text-[14px]">
+                The fragile watermark pattern that should be present vs. what was actually
+                extracted{fileType === 'video' && activeFrame ? ` from frame ${activeFrame.frame}` : ' from this file'} —
+                red bits mark where it was corrupted by tampering
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-[#111318] border border-white/10 rounded-3xl p-8 shadow-xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              {/* Original / expected pattern */}
+              <div className="flex flex-col items-center gap-3">
+                <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold tracking-widest uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  <Icon icon="lucide:badge-check" width="13" /> Original
+                </span>
+                <div className="w-full max-w-[300px] aspect-square bg-[#0a0a0c] rounded-2xl border border-white/5 overflow-hidden">
+                  <img src={wmOrig} alt="original watermark"
+                       className="w-full h-full object-contain"
+                       style={{ imageRendering: 'pixelated' }} />
+                </div>
+                <p className="text-[12px] text-slate-500">Expected pattern</p>
+              </div>
+
+              {/* Extracted pattern (tampered bits in red) — or a deleted placeholder */}
+              <div className="flex flex-col items-center gap-3">
+                <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold tracking-widest uppercase border bg-rose-500/10 text-rose-400 border-rose-500/30">
+                  <Icon icon={activeIsDeleted ? 'lucide:trash-2' : 'lucide:alert-triangle'} width="13" />
+                  {activeIsDeleted ? 'Deleted' : 'Extracted'}
+                </span>
+                <div className="w-full max-w-[300px] aspect-square bg-[#0a0a0c] rounded-2xl border border-white/5 overflow-hidden flex items-center justify-center">
+                  {activeIsDeleted ? (
+                    <div className="flex flex-col items-center gap-2 text-rose-400/80 px-4 text-center">
+                      <Icon icon="lucide:image-off" width="40" strokeWidth="1.5" />
+                      <span className="text-[12px] font-medium">Frame deleted —<br />nothing to extract</span>
+                    </div>
+                  ) : (
+                    <img src={wmExt} alt="extracted watermark"
+                         className="w-full h-full object-contain"
+                         style={{ imageRendering: 'pixelated' }} />
+                  )}
+                </div>
+                <p className="text-[12px] text-slate-500">
+                  {activeIsDeleted
+                    ? <span className="text-rose-400">This frame is missing from the clip</span>
+                    : <>Recovered from file · <span className="text-rose-400">red = corrupted</span></>}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-[13px] text-slate-500 max-w-[640px] mx-auto mt-8 text-center leading-relaxed border-t border-white/5 pt-6">
+              The fragile watermark is a pseudo-random parity pattern keyed to the media's
+              identity, so it looks like noise — but any region that was edited flips its bits,
+              surfacing as red blocks that pinpoint exactly where the tampering happened.
+              {fileType === 'video' && ' Select a tampered (red) frame above to inspect its watermark.'}
+            </p>
           </div>
         </section>
       )}
@@ -299,11 +441,11 @@ export default function Results({ result, navigate }: ResultsProps) {
         <div className="flex items-center gap-3 mb-6">
           <Icon icon="lucide:activity" className="text-cyan-400" width="24" />
           <div>
-            <h2 className="text-[22px] font-medium text-white leading-none mb-1">Signal Attention Map</h2>
+            <h2 className="text-[22px] font-medium text-white leading-none mb-1">Sub-Block Parity Map</h2>
             <p className="text-slate-400 text-[14px]">
               {activeFrame
                 ? `Frame ${activeFrame.frame} · ${activeFrame.status === 'tampered' ? 'tampered' : 'authentic'} · click any frame above to switch`
-                : 'Regions where the neural watermark signal was disrupted'}
+                : 'Chroma sub-blocks where the SHA-256 LSB parity did not match'}
             </p>
           </div>
         </div>
@@ -369,7 +511,7 @@ export default function Results({ result, navigate }: ResultsProps) {
               <span className="font-medium">Stable Signal (Authentic)</span>
             </div>
             <p className="text-[13px] text-slate-500 max-w-[300px] mt-4 leading-relaxed border-l-2 border-white/10 pl-4">
-              The neural decoder highlights grid cells where the expected HIDDeN bit payload deviates significantly from the extracted payload, indicating spatial manipulation.
+              Each cell maps to a 16×16 chroma sub-block. Red cells indicate the regenerated SHA-256 parity does not match the extracted LSB parity — pinpointing the pixels that were altered.
             </p>
           </div>
         </div>
@@ -385,7 +527,7 @@ export default function Results({ result, navigate }: ResultsProps) {
         <button onClick={() => {
           const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })
           const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-          a.download = `waterguard_report_${Date.now()}.json`; a.click()
+          a.download = `aegis_report_${Date.now()}.json`; a.click()
         }} className="px-8 py-4 bg-[#111318] border border-white/10 text-white font-medium rounded-xl hover:bg-white/5 hover:border-white/20 transition-all text-[15px] flex items-center gap-2">
           <Icon icon="lucide:download" width="18" />
           Download Raw JSON Report

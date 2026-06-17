@@ -65,7 +65,7 @@ export default function Register({ navigate }: RegisterProps) {
           <Icon icon="lucide:user-plus" width="14" />
           Create Account
         </div>
-        <h1 className="font-display text-[clamp(2rem,4vw,2.6rem)] text-white font-normal mb-3 leading-tight tracking-tight">Join WaterGuard</h1>
+        <h1 className="font-display text-[clamp(2rem,4vw,2.6rem)] text-white font-normal mb-3 leading-tight tracking-tight">Join Aegis</h1>
         <p className="text-slate-400 text-[14.5px]">Encode and track your protected media.</p>
       </div>
 

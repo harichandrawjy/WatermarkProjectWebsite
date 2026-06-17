@@ -13,10 +13,11 @@ const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 const ENCODE_STEPS = [
   'Reading media file...',
-  'Generating watermark payload...',
-  'Running HIDDeN encoder...',
-  'Applying attention bottleneck...',
-  'Embedding semi-fragile layer...',
+  'Building BCH(15,7) payload...',
+  'Applying 2-level LWT to Y channel...',
+  'Running 8x8 block DCT + SVD...',
+  'Embedding bits via QIM on S₀...',
+  'Embedding SHA-256 parity in Cb LSBs...',
   'Finalizing watermarked output...',
 ]
 
@@ -201,7 +202,7 @@ export default function Encode({ navigate }: EncodeProps) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
         {[
           { n: '01', title: 'Upload original', desc: 'Your clean, unmodified media' },
-          { n: '02', title: 'Embed watermark', desc: 'HIDDeN adds invisible signal' },
+          { n: '02', title: 'Embed watermark', desc: 'LWT + DCT + SVD with QIM payload' },
           { n: '03', title: 'Download secure', desc: 'Use or share the protected file' },
         ].map((s, i) => (
           <div key={i} className="bg-[#111318]/80 backdrop-blur-sm border border-white/5 rounded-2xl px-5 py-4 flex items-center gap-4">

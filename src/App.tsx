@@ -20,9 +20,12 @@ export interface TamperedRegion {
 
 export interface FrameResult {
   frame: number
-  status: 'tampered' | 'authentic'
+  status: 'tampered' | 'authentic' | 'deleted'
   confidence: number
   tamperedRegions?: TamperedRegion[]
+  // Per-frame fragile-watermark comparison (only present for tampered frames).
+  watermarkOriginal?: string
+  watermarkExtracted?: string
 }
 
 export interface AnalysisResult {
@@ -43,6 +46,18 @@ export interface AnalysisResult {
   frameTamperRate?: number
   imageWidth?: number
   imageHeight?: number
+  // Temporal localization for video: deletions/reorders surfaced as discrete
+  // events instead of cascading across every later frame.
+  missingFrames?: number[]
+  framesDeleted?: number
+  reordered?: boolean
+  duplicateFrames?: number[]
+  framesTruncated?: number
+  // PNG data URLs of the fragile watermark: the expected pattern vs. the one
+  // extracted from this file (tampered bits highlighted red) — for the
+  // side-by-side comparison on the Results page.
+  watermarkOriginal?: string
+  watermarkExtracted?: string
 }
 
 export default function App() {

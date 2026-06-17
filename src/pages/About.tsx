@@ -8,10 +8,10 @@ const TEAM = [
 ]
 
 const TECH = [
-  { cat: 'Watermarking',  items: ['HIDDeN', 'Attention Bottleneck', 'OpenCV', 'NumPy', 'FFmpeg'] },
-  { cat: 'ML / Training', items: ['PyTorch', 'Torchvision', 'EfficientNet-B4', 'ViT', 'Albumentations'] },
-  { cat: 'Backend / API', items: ['FastAPI', 'Python', 'MySQL', 'REST API', 'JSON'] },
-  { cat: 'Frontend',      items: ['React', 'TypeScript', 'Vite', 'Tailwind CSS'] },
+  { cat: 'Watermarking',     items: ['LWT', 'DCT', 'SVD', 'QIM', 'BCH(15,7)', 'SHA-256'] },
+  { cat: 'Signal Processing',items: ['NumPy', 'OpenCV', 'PyWavelets', 'SciPy', 'galois', 'FFmpeg'] },
+  { cat: 'Backend / API',    items: ['FastAPI', 'Python', 'Supabase', 'REST API', 'JSON'] },
+  { cat: 'Frontend',         items: ['React', 'TypeScript', 'Vite', 'Tailwind CSS'] },
 ]
 
 const PHASES = [
@@ -39,10 +39,10 @@ export default function About() {
       {/* Page header */}
       <div className="text-center pt-20 pb-16">
         <h1 className="font-display text-[clamp(2.5rem,5vw,4rem)] text-white font-semibold mb-6 tracking-tight">
-          About <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">WaterGuard</span>
+          About <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Aegis</span>
         </h1>
         <p className="text-slate-400 text-[1.1rem] max-w-2xl mx-auto leading-relaxed">
-          Next-generation multimedia tamper detection utilizing invisible semi-fragile watermarking and deep-learning spatio-temporal localization.
+          Multimedia tamper detection using invisible semi-fragile watermarking with LWT + DCT + SVD payload encoding and per-sub-block parity localization.
         </p>
       </div>
 
@@ -92,11 +92,11 @@ export default function About() {
               `}</style>
 
               {[
-                { label: 'Original Media',   icon: 'lucide:image',         color: 'bg-[#0a0a0c] border-white/10 text-slate-300' },
-                { label: 'HIDDeN Encoder',   icon: 'lucide:cpu',           color: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]' },
-                { label: 'Protected Media',  icon: 'lucide:shield-check',  color: 'bg-[#0a0a0c] border-white/10 text-slate-300' },
-                { label: 'CNN Decoder',      icon: 'lucide:microscope',    color: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]' },
-                { label: 'Tamper Result',    icon: 'lucide:file-check-2',  color: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' },
+                { label: 'Original Media',      icon: 'lucide:image',         color: 'bg-[#0a0a0c] border-white/10 text-slate-300' },
+                { label: 'LWT + DCT + SVD',     icon: 'lucide:cpu',           color: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]' },
+                { label: 'Protected Media',     icon: 'lucide:shield-check',  color: 'bg-[#0a0a0c] border-white/10 text-slate-300' },
+                { label: 'QIM Detector + BCH',  icon: 'lucide:microscope',    color: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]' },
+                { label: 'Tamper Result',       icon: 'lucide:file-check-2',  color: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' },
               ].map((node, i) => (
                 <div key={i} className={`relative z-10 w-full px-5 py-4 border rounded-2xl flex items-center justify-center gap-3 text-[14px] font-medium backdrop-blur-md mb-4 last:mb-0 transition-transform hover:scale-[1.02] ${node.color}`}>
                   <Icon icon={node.icon} width="18" className="opacity-80" />
@@ -138,17 +138,17 @@ export default function About() {
             {
               step: '01',
               title: 'Watermark Embedding',
-              body: 'The original media passes through a HIDDeN encoder with an Attention Bottleneck. The encoder generates an imperceptible perturbation embedding a binary watermark string. A noise layer simulates real-world degradation while remaining sensitive to tampering.',
+              body: 'The Y (luminance) channel is decomposed by a 2-level Lifting Wavelet Transform; the LLLL sub-band is divided into 8×8 blocks, each transformed by DCT then SVD. The BCH(15,7)-coded payload bits — owner / media / frame / chain IDs — are embedded by Quantization Index Modulation on the largest singular value S₀, then the inverse transforms reconstruct the watermarked frame.',
             },
             {
               step: '02',
               title: 'Integrity Verification',
-              body: 'A CNN-based decoder extracts watermark bits from the media. The recovered bits are compared with the original watermark via an Integrity Verification Module. A high Bit Error Rate (BER) in specific regions signals potential manipulation.',
+              body: 'Verification re-runs the LWT → 8×8 DCT → SVD chain on the Y channel, extracts payload bits via a QIM detector, and decodes them with BCH(15,7) + majority vote. The recovered owner / media / frame / chain IDs are matched against the stored record to confirm ownership and detect temporal anomalies (deleted, duplicated, or reordered frames).',
             },
             {
               step: '03',
               title: 'Tamper Localization',
-              body: 'When tampering is detected, EfficientNet-B4 combined with a Vision Transformer (ViT) performs fine-grained spatial localization. Modified regions are highlighted, and a frame-level temporal analysis is generated for video content.',
+              body: 'In parallel, the Cb chroma channel carries a fragile layer: a SHA-256 parity over (signature, frame_id) is embedded in the LSB of each 16×16 sub-block mean. During verification this parity is regenerated and compared per sub-block — any mismatch pinpoints the exact altered region, giving fine-grained spatial localization plus per-frame temporal analysis for video.',
             },
           ].map((m, i) => (
             <div key={i} className="bg-[#111318] border border-white/5 border-t-[3px] border-t-cyan-500 rounded-3xl p-8 hover:-translate-y-1 transition-transform shadow-lg">
