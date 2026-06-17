@@ -44,11 +44,7 @@ export default function Navbar({ currentPage, navigate }: NavbarProps) {
           className="group flex items-center gap-2.5 font-display font-semibold text-[17px] text-white shrink-0 transition-opacity"
         >
           <span className="text-cyan-400 transition-all duration-300 group-hover:drop-shadow-[0_0_12px_rgba(34,211,238,0.6)] group-hover:scale-105">
-            <svg width="24" height="24" viewBox="0 0 22 22" fill="none">
-              <rect x="1" y="1" width="20" height="20" rx="5" stroke="currentColor" strokeWidth="1.8"/>
-              <path d="M6 11h10M11 6v10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-              <circle cx="11" cy="11" r="2.5" fill="currentColor"/>
-            </svg>
+            <Icon icon="lucide:shield-check" width="24" height="24" strokeWidth={1.8} />
           </span>
           <span className="tracking-wide">Aegis</span>
         </button>

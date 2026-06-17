@@ -15,6 +15,18 @@
   }
 }
 
+@layer utilities {
+  /* Indeterminate progress bar — a moving gradient stripe.  Used by the
+     encode/verify loaders so we don't lie about a known percentage. */
+  @keyframes indeterminate {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
+  }
+  .animate-indeterminate {
+    animation: indeterminate 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+}
+
 @layer components {
   /* Slim dark-theme scrollbar with a cyan accent — applied to any container
      that overflows on the dark panels (Spatial Localization table, etc.). */

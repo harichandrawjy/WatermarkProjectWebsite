@@ -93,18 +93,23 @@ export default function Verify({ onComplete }: VerifyProps) {
     return () => { cancelled = true }
   }, [metaSource, manualId, metaFile, lastId])
 
-  // Animate the step indicator while the request is in-flight.
+  // Real elapsed-time tick + step-label hint cycle while the request is
+  // in-flight.  `progress` now stores elapsed seconds (not a fake percent).
   useEffect(() => {
     if (stage !== 'verifying') return
-    let i = 0
+    const started = Date.now()
     setStepIdx(0)
-    setProgress(5)
-    const t = setInterval(() => {
-      i = Math.min(i + 1, VERIFY_STEPS.length - 1)
-      setStepIdx(i)
-      setProgress(p => Math.min(p + 10, 92))
-    }, 500)
-    return () => clearInterval(t)
+    setProgress(0)
+
+    const tick = setInterval(() => {
+      setProgress(Math.floor((Date.now() - started) / 1000))
+    }, 1000)
+
+    const cycle = setInterval(() => {
+      setStepIdx(i => (i + 1) % VERIFY_STEPS.length)
+    }, 1500)
+
+    return () => { clearInterval(tick); clearInterval(cycle) }
   }, [stage])
 
   const handleFile = (f: File) => {
@@ -291,27 +296,29 @@ export default function Verify({ onComplete }: VerifyProps) {
                 <p className="text-rose-400 text-[14px] font-medium min-h-[20px]">{VERIFY_STEPS[stepIdx]}</p>
               </div>
 
+              {/* Indeterminate progress bar + real elapsed clock. */}
               <div className="w-full max-w-sm mt-2">
                 <div className="flex justify-between text-[12px] font-bold text-slate-400 mb-2">
-                  <span>Processing...</span>
-                  <span className="text-white">{progress}%</span>
+                  <span>Working...</span>
+                  <span className="text-white font-mono">
+                    {String(Math.floor(progress / 60)).padStart(2, '0')}:{String(progress % 60).padStart(2, '0')}
+                  </span>
                 </div>
-                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                  <div className="h-full bg-gradient-to-r from-rose-500 to-amber-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${progress}%` }} />
+                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
+                  <div className="h-full w-2/5 bg-gradient-to-r from-rose-500 via-amber-400 to-rose-500 rounded-full shadow-[0_0_10px_rgba(244,63,94,0.5)] animate-indeterminate" />
                 </div>
               </div>
 
               <div className="flex flex-col gap-3 w-full max-w-sm mt-6 text-left border-t border-white/5 pt-6">
                 {VERIFY_STEPS.map((s, i) => {
-                  const isDone = i < stepIdx;
-                  const isCurrent = i === stepIdx;
+                  const isCurrent = i === stepIdx
                   return (
                     <div key={i} className={`flex items-center gap-3 text-[13px] transition-colors duration-300
-                      ${isDone ? 'text-amber-400' : isCurrent ? 'text-white font-medium' : 'text-slate-600'}`}>
+                      ${isCurrent ? 'text-white font-medium' : 'text-slate-600'}`}>
                       <span className="w-5 shrink-0 flex justify-center">
-                        {isDone ? <Icon icon="lucide:check-circle-2" width="16" /> :
-                         isCurrent ? <span className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e] animate-pulse" /> :
-                         <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
+                        {isCurrent
+                          ? <span className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e] animate-pulse" />
+                          : <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
                       </span>
                       {s}
                     </div>

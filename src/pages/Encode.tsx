@@ -55,18 +55,28 @@ export default function Encode({ navigate }: EncodeProps) {
   const onDrop     = useCallback((e: React.DragEvent) => { e.preventDefault(); setStage('idle'); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }, [])
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setStage('dragging') }
 
-  // Animate the step indicator on a loop while the request is in-flight.
+  // Real elapsed-time tick + step-label hint cycle while the request is
+  // in-flight.  We do NOT fake a "% done" — the backend doesn't stream
+  // progress, so anything more precise than "still working" would be a lie.
+  // `progress` here is repurposed as elapsed seconds (used only by display).
   useEffect(() => {
     if (stage !== 'encoding') return
-    let i = 0
+    const started = Date.now()
     setStepIdx(0)
-    setProgress(5)
-    const t = setInterval(() => {
-      i = Math.min(i + 1, ENCODE_STEPS.length - 1)
-      setStepIdx(i)
-      setProgress(p => Math.min(p + 12, 92))
-    }, 600)
-    return () => clearInterval(t)
+    setProgress(0)
+
+    const tick = setInterval(() => {
+      setProgress(Math.floor((Date.now() - started) / 1000))
+    }, 1000)
+
+    // Cycle the step labels every ~1.5s so the user sees the conceptual
+    // pipeline.  Labels are hints, not commitments — we never mark earlier
+    // ones "done" until the response actually arrives.
+    const cycle = setInterval(() => {
+      setStepIdx(i => (i + 1) % ENCODE_STEPS.length)
+    }, 1500)
+
+    return () => { clearInterval(tick); clearInterval(cycle) }
   }, [stage])
 
   const startEncoding = async () => {
@@ -316,27 +326,31 @@ export default function Encode({ navigate }: EncodeProps) {
                 <p className="text-cyan-400 text-[14px] font-medium min-h-[20px]">{ENCODE_STEPS[stepIdx]}</p>
               </div>
 
+              {/* Indeterminate progress: real backend timing isn't streamed,
+                  so we show an honest moving stripe + elapsed seconds rather
+                  than a fake percentage that lies about progress. */}
               <div className="w-full max-w-sm mt-2">
                 <div className="flex justify-between text-[12px] font-bold text-slate-400 mb-2">
-                  <span>Processing...</span>
-                  <span className="text-white">{progress}%</span>
+                  <span>Working...</span>
+                  <span className="text-white font-mono">
+                    {String(Math.floor(progress / 60)).padStart(2, '0')}:{String(progress % 60).padStart(2, '0')}
+                  </span>
                 </div>
-                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                  <div className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(34,211,238,0.5)]" style={{ width: `${progress}%` }} />
+                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
+                  <div className="h-full w-2/5 bg-gradient-to-r from-cyan-500 via-emerald-400 to-cyan-500 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.5)] animate-indeterminate" />
                 </div>
               </div>
 
               <div className="flex flex-col gap-3 w-full max-w-sm mt-6 text-left border-t border-white/5 pt-6">
                 {ENCODE_STEPS.map((s, i) => {
-                  const isDone = i < stepIdx;
-                  const isCurrent = i === stepIdx;
+                  const isCurrent = i === stepIdx
                   return (
                     <div key={i} className={`flex items-center gap-3 text-[13px] transition-colors duration-300
-                      ${isDone ? 'text-emerald-400' : isCurrent ? 'text-white font-medium' : 'text-slate-600'}`}>
+                      ${isCurrent ? 'text-white font-medium' : 'text-slate-600'}`}>
                       <span className="w-5 shrink-0 flex justify-center">
-                        {isDone ? <Icon icon="lucide:check-circle-2" width="16" /> :
-                         isCurrent ? <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" /> :
-                         <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
+                        {isCurrent
+                          ? <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" />
+                          : <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
                       </span>
                       {s}
                     </div>
