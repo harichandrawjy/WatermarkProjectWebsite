@@ -18,9 +18,22 @@ Added Supabase-backed authentication to Aegis, gated `/encode` behind login, and
 | `requirements.txt` | Added `pydantic[email]` for `EmailStr` validation on auth bodies. |
 | `migrations/001_add_user_id.sql` *(new)* | `ALTER TABLE watermarks ADD COLUMN user_id UUID REFERENCES auth.users(id)` + index + `created_at` default. |
 
-### Why use the user's email as the watermark owner string?
+### Why the watermark owner is *not* the user's email
 
-The engine truncates `owner` to `OWNER_ID_BYTES = 8` when embedding bits. The database keeps the full email (so `/lookup` still works after compression). Behavior matches what was already there for free-text owners — except now the value can't be spoofed by the client.
+> **Superseded.** This section originally said the email was embedded directly, and that keeping the full email in the DB was enough because "`/lookup` still works after compression." That reasoning was wrong and has been fixed — see migration `003_add_profiles_short_id.sql`.
+
+The engine truncates `owner` to `OWNER_ID_BYTES = 8` when embedding. Embedding the email therefore meant the watermark only ever carried its first 8 characters, so any two accounts sharing that prefix became the **same owner**:
+
+```
+john.smith@gmail.com        ->  john.smi
+john.smigielski@outlook.com ->  john.smi     <-- indistinguishable
+```
+
+Keeping the full email in the DB did not rescue this, because `/lookup` matches on `owner_key` — the *truncated* form. The full email was only ever part of the response, never part of the match, so it provided no separating power. The consequences were real: `/lookup` could attribute a file to the wrong account, and `/encode`'s duplicate check could block one user with another user's record while quoting that user's `media_id` back in the error.
+
+Now each account is assigned an 8-character `short_id` (`profiles` table, `UNIQUE` + a format `CHECK` so it can never be truncated by the engine), and *that* is what gets embedded. The email stays in `watermarks.owner` purely for display and is still what `/lookup` returns, so nothing changes for the user.
+
+The owner value still can't be spoofed by the client — it's derived from the JWT either way.
 
 ## Frontend changes (`src/`)
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Encode from './pages/Encode'
@@ -8,11 +8,12 @@ import About from './pages/About'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
-import { AuthProvider } from './context/auth'
+import ForgotPassword from './pages/ForgotPassword'
+import { AuthProvider, useAuth } from './context/auth'
 
 export type Page =
   | 'home' | 'encode' | 'verify' | 'results' | 'about'
-  | 'login' | 'register' | 'dashboard'
+  | 'login' | 'register' | 'dashboard' | 'forgot'
 
 export interface TamperedRegion {
   x: number; y: number; w: number; h: number; label: string
@@ -40,8 +41,14 @@ export interface AnalysisResult {
   watermarkFound?: boolean
   ownerMatch?: boolean
   mediaMatch?: boolean
+  // Recovered: the raw strings actually extracted from the watermark. Present
+  // even when they don't match, so the UI can show what was really in the file.
   ownerId?: string
   mediaId?: string
+  // Expected: the human-readable labels from the metadata / database record.
+  // Display only — never evidence of what the file contains.
+  ownerLabel?: string
+  mediaLabel?: string
   framesChecked?: number
   frameTamperRate?: number
   imageWidth?: number
@@ -61,6 +68,17 @@ export interface AnalysisResult {
 }
 
 export default function App() {
+  // AppShell is a separate component because it calls useAuth(), which only
+  // works beneath the provider.
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
+  )
+}
+
+function AppShell() {
+  const { recoveryToken } = useAuth()
   const [page, setPage] = useState<Page>('home')
   const [result, setResult] = useState<AnalysisResult | null>(null)
 
@@ -69,14 +87,24 @@ export default function App() {
     window.scrollTo(0, 0)
   }
 
+  // A recovery link lands on whatever page the app opens at, with the token in
+  // the URL hash. Once the provider has picked it up, take the user straight
+  // to the reset form — otherwise they'd sit on the home page holding a valid
+  // one-shot token with nothing prompting them to use it.
+  useEffect(() => {
+    if (recoveryToken) {
+      setPage('forgot')
+      window.scrollTo(0, 0)
+    }
+  }, [recoveryToken])
+
   const handleVerifyComplete = (r: AnalysisResult) => {
     setResult(r)
     navigate('results')
   }
 
   return (
-    <AuthProvider>
-      <div className="min-h-screen flex flex-col bg-[#0a0a0c] text-slate-300 font-sans selection:bg-cyan-500/30">
+    <div className="min-h-screen flex flex-col bg-[#0a0a0c] text-slate-300 font-sans selection:bg-cyan-500/30">
 
         <Navbar currentPage={page} navigate={navigate} />
 
@@ -91,9 +119,9 @@ export default function App() {
           {page === 'login'     && <Login navigate={navigate} />}
           {page === 'register'  && <Register navigate={navigate} />}
           {page === 'dashboard' && <Dashboard navigate={navigate} />}
+          {page === 'forgot'    && <ForgotPassword navigate={navigate} />}
         </main>
 
-      </div>
-    </AuthProvider>
+    </div>
   )
 }

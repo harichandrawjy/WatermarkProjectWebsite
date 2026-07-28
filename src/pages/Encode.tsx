@@ -42,6 +42,9 @@ export default function Encode({ navigate }: EncodeProps) {
   const [mediaId,     setMediaId]    = useState('')
   const [encodedId,   setEncodedId]  = useState<string | null>(null)
   const [encodedKind, setEncodedKind] = useState<'image' | 'video'>('image')
+  // The 8-char owner tag the backend assigned and embedded in the pixels —
+  // not the email, which is too long to fit the watermark's owner slot.
+  const [ownerTag,    setOwnerTag]   = useState<string | null>(null)
   const [errorMsg,    setErrorMsg]   = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -114,6 +117,8 @@ export default function Encode({ navigate }: EncodeProps) {
       setPsnr(data.psnr_db)
       setEncodedId(data.id)
       setEncodedKind(data.kind)
+      const tag = (data.metadata as { owner_id?: unknown })?.owner_id
+      setOwnerTag(typeof tag === 'string' ? tag : null)
       setProgress(100)
       setStepIdx(ENCODE_STEPS.length - 1)
       setStage('done')
@@ -151,7 +156,7 @@ export default function Encode({ navigate }: EncodeProps) {
   const reset = () => {
     setFile(null); setPreview(null); setWmPreview(null)
     setStage('idle'); setProgress(0); setStepIdx(0); setPsnr(0)
-    setEncodedId(null); setErrorMsg('')
+    setEncodedId(null); setOwnerTag(null); setErrorMsg('')
   }
 
   // Sign-in gate: encode now requires an authenticated user so we can tie
@@ -241,7 +246,10 @@ export default function Encode({ navigate }: EncodeProps) {
                 </div>
                 <div>
                   <p className="font-semibold text-[14px] text-emerald-400">Watermark embedded successfully</p>
-                  <p className="text-[12.5px] text-emerald-400/70">PSNR: {psnr.toFixed(1)} dB · ID: {encodedId}</p>
+                  <p className="text-[12.5px] text-emerald-400/70">
+                    PSNR: {psnr.toFixed(1)} dB · ID: {encodedId}
+                    {ownerTag && <> · Owner tag: <span className="font-mono">{ownerTag}</span></>}
+                  </p>
                 </div>
               </div>
 

@@ -30,6 +30,59 @@ function MetricCard({ label, value, sub, danger, highlight }: MetricCardProps) {
   )
 }
 
+/** Render a recovered id safely.
+ *
+ * A corrupted payload decodes to arbitrary bytes — the decoder happily returns
+ * things like `7nnzgb\x0ed`. Control characters draw as invisible gaps, which
+ * reads as a broken page rather than as evidence of damage, so escape them.
+ */
+function printable(s: string): string {
+  return Array.from(s).map(ch => {
+    const c = ch.codePointAt(0)!
+    return (c < 0x20 || c === 0x7f)
+      ? `\\x${c.toString(16).padStart(2, '0')}`
+      : ch                       // U+FFFD already renders visibly as a glyph
+  }).join('')
+}
+
+interface ExtractedLineProps {
+  /** The human-readable value from the metadata — what we expected to find. */
+  expected?: string
+  /** What the decoder actually pulled out of the pixels. */
+  recovered?: string
+  matched?: boolean
+}
+
+/** The small mono line under each identity card.
+ *
+ * The card's headline shows the readable label (an email, a media name). That
+ * label comes from the metadata you supplied, so on its own it is not evidence
+ * of anything. This line shows what was genuinely extracted from the file —
+ * and on a mismatch, shows it next to the expected value so a corrupted
+ * payload is visible rather than hidden behind a "Mismatch" badge.
+ */
+function ExtractedLine({ expected, recovered, matched }: ExtractedLineProps) {
+  if (!recovered) {
+    return (
+      <p className="text-[11px] text-slate-500 mt-2 font-mono">
+        nothing recovered from the file
+      </p>
+    )
+  }
+  // Only worth showing both when they actually differ — when the label IS the
+  // recovered value there's nothing to compare.
+  const showBoth = matched === false && expected && expected !== recovered
+  return (
+    <p className="text-[11px] mt-2 font-mono break-all">
+      {showBoth && (
+        <span className="text-slate-500">expected <span className="text-slate-400">{expected}</span> · </span>
+      )}
+      <span className="text-slate-500">extracted </span>
+      <span className={matched === false ? 'text-rose-400' : 'text-emerald-400'}>{printable(recovered)}</span>
+    </p>
+  )
+}
+
 export default function Results({ result, navigate }: ResultsProps) {
   const [selectedFrame, setSelectedFrame] = useState<number | null>(null)
 
@@ -53,13 +106,14 @@ export default function Results({ result, navigate }: ResultsProps) {
   )
 
   const { status, confidence, wmAccuracy, ber, tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight,
-          watermarkFound, ownerMatch, mediaMatch, ownerId, mediaId,
+          watermarkFound, ownerMatch, mediaMatch, ownerId, mediaId, ownerLabel, mediaLabel,
           watermarkOriginal, watermarkExtracted,
           missingFrames, reordered, duplicateFrames, framesTruncated } = result
   const tampered = status === 'tampered'
 
-  // If the backend didn't explicitly say, infer "found" from whether we have any
-  // ID to show or whether the watermark accuracy crossed a sane threshold.
+  // If the backend didn't explicitly say, infer "found" from whether anything
+  // was actually recovered from the pixels — NOT from the supplied metadata,
+  // which is present whether or not the file contains a watermark.
   const wmFound = watermarkFound ?? (wmAccuracy >= 0.5 || Boolean(ownerId || mediaId))
 
   // For video, the spatial heatmap reflects whichever frame is selected;
@@ -188,8 +242,9 @@ export default function Results({ result, navigate }: ResultsProps) {
                   )}
                 </div>
                 <p className="font-mono text-[15px] text-rose-300 break-all">
-                  {mediaId || <span className="text-slate-600">— not provided —</span>}
+                  {mediaLabel || mediaId || <span className="text-slate-600">— not provided —</span>}
                 </p>
+                <ExtractedLine expected={mediaLabel} recovered={mediaId} matched={mediaMatch} />
               </div>
 
               {/* Owner ID */}
@@ -208,8 +263,9 @@ export default function Results({ result, navigate }: ResultsProps) {
                   )}
                 </div>
                 <p className="font-mono text-[15px] text-cyan-300 break-all">
-                  {ownerId || <span className="text-slate-600">— not provided —</span>}
+                  {ownerLabel || ownerId || <span className="text-slate-600">— not provided —</span>}
                 </p>
+                <ExtractedLine expected={ownerLabel} recovered={ownerId} matched={ownerMatch} />
               </div>
             </div>
           ) : (

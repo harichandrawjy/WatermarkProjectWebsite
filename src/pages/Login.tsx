@@ -53,7 +53,13 @@ export default function Login({ navigate }: LoginProps) {
         </div>
 
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Password</label>
+          <div className="flex items-baseline justify-between mb-2">
+            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Password</label>
+            <button type="button" onClick={() => navigate('forgot')}
+              className="text-[11.5px] text-cyan-400 hover:underline">
+              Forgot password?
+            </button>
+          </div>
           <input
             type="password" required autoComplete="current-password"
             value={password} onChange={e => setPassword(e.target.value)}

@@ -98,7 +98,9 @@ export default function Verify({ onComplete }: VerifyProps) {
           return ''
         }
         return {
-          owner:   pick('owner', 'owner_id', 'ownerId'),
+          // `owner_email` first: since the short_id change, `owner_id` holds
+          // the 8-char tag that was embedded, not a readable address.
+          owner:   pick('owner_email', 'owner', 'owner_id', 'ownerId'),
           mediaId: pick('media', 'media_id', 'mediaId', 'id'),
         }
       } catch { return null }
@@ -256,8 +258,13 @@ export default function Verify({ onComplete }: VerifyProps) {
         reordered: raw.reordered,
         duplicateFrames: raw.duplicateFrames,
         framesTruncated: raw.framesTruncated,
-        ownerId: raw.ownerId ?? metaInfo?.owner,
-        mediaId: raw.mediaId ?? metaInfo?.mediaId,
+        // No `?? metaInfo` fallback here: these are what the decoder pulled
+        // out of the pixels. Falling back to the supplied metadata would make
+        // an unrecoverable watermark look like a successfully recovered one.
+        ownerId:    raw.ownerId,
+        mediaId:    raw.mediaId,
+        ownerLabel: metaInfo?.owner,
+        mediaLabel: metaInfo?.mediaId,
         watermarkOriginal: raw.watermarkOriginal,
         watermarkExtracted: raw.watermarkExtracted,
       }
@@ -650,7 +657,12 @@ export default function Verify({ onComplete }: VerifyProps) {
               Privacy Notice
             </h4>
             <p className="text-[12.5px] text-slate-300 leading-relaxed">
-              Uploaded files are processed securely in memory for analysis only and are deleted immediately after the report is generated. No media is stored on our servers.
+              Files you upload here are used only to produce this report, and are deleted from the
+              server as soon as it has been generated — including if the analysis fails.
+            </p>
+            <p className="text-[12.5px] text-slate-400 leading-relaxed mt-3">
+              Watermarked files you create in <strong className="text-white font-medium">Encode</strong> are
+              kept, so you can re-download them from your Dashboard.
             </p>
           </div>
 

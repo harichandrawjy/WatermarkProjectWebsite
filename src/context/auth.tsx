@@ -26,6 +26,13 @@ interface AuthContextValue {
   logout:      () => void
   /** Fetch wrapper that injects the Bearer token and auto-refreshes once on 401. */
   authedFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+  /**
+   * Set when the user arrived via a password-recovery link
+   * (`#access_token=...&type=recovery`). While this is non-null the app shows
+   * the "choose a new password" form. Cleared once the reset succeeds.
+   */
+  recoveryToken: string | null
+  clearRecovery: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -34,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user,    setUser]    = useState<AuthUser | null>(null)
   const [token,   setToken]   = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [recoveryToken, setRecoveryToken] = useState<string | null>(null)
 
   // Keep latest token/refresh in a ref so `authedFetch` (returned as a stable
   // closure) always sees the current values without going stale.
@@ -104,7 +112,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const params       = new URLSearchParams(hash.replace(/^#/, ''))
       const accessToken  = params.get('access_token')
       const refreshToken = params.get('refresh_token')
+      const linkType     = params.get('type')
       if (!accessToken) return false
+
+      // Password-recovery links use this same hash shape as signup
+      // confirmation, differing only by `type=recovery`. Without this branch
+      // the token would be consumed as an ordinary sign-in and scrubbed from
+      // the URL below — logging the user in but silently discarding the one
+      // credential that lets them actually set a new password.
+      if (linkType === 'recovery') setRecoveryToken(accessToken)
 
       try {
         const res = await fetch(`${API_BASE}/auth/me`, {
@@ -271,7 +287,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, authedFetch }}>
+    <AuthContext.Provider value={{
+      user, token, loading, login, register, logout, authedFetch,
+      recoveryToken, clearRecovery: () => setRecoveryToken(null),
+    }}>
       {children}
     </AuthContext.Provider>
   )
