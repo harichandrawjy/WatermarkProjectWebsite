@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,52 +7,164 @@
 @layer base {
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background-color: #f8f7f4;
-    color: #1a1916;
-    -webkit-font-smoothing: antialiased;
-  }
-}
 
-@layer utilities {
-  /* Indeterminate progress bar — a moving gradient stripe.  Used by the
-     encode/verify loaders so we don't lie about a known percentage. */
-  @keyframes indeterminate {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(250%); }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
   }
-  .animate-indeterminate {
-    animation: indeterminate 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+
+  /* Keyboard users get a real, consistent focus ring. Previously buttons had
+     none at all and inputs only nudged their border colour. */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-canvas;
+  }
+
+  ::selection {
+    @apply bg-accent/25 text-white;
+  }
+
+  /* Chrome paints autofilled fields with its own near-white background, which
+     blows a hole in a dark form. There's no property to override it directly —
+     the standard workaround is an inset box-shadow large enough to cover the
+     field, plus text-fill-color for the value itself. The absurd transition
+     delay stops Chrome re-applying its colour on focus. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px theme(colors.surface.inset) inset;
+    -webkit-text-fill-color: theme(colors.ink.hi);
+    caret-color: theme(colors.ink.hi);
+    transition: background-color 9999s ease-out 0s;
   }
 }
 
 @layer components {
-  /* Slim dark-theme scrollbar with a cyan accent — applied to any container
-     that overflows on the dark panels (Spatial Localization table, etc.). */
+  /* ── Layout ─────────────────────────────────────────────────────────── */
+
+  .page        { @apply max-w-[1120px] mx-auto px-6 sm:px-8; }
+  .page-narrow { @apply max-w-md mx-auto px-6; }
+
+  /* Standard page header block: eyebrow badge → title → lead paragraph. */
+  .page-title { @apply font-display text-4xl sm:text-5xl text-ink-hi font-normal; }
+  .page-lead  { @apply text-md text-ink leading-relaxed; }
+
+  /* Section heading used down the length of Results / About. */
+  .section-title { @apply text-xl font-medium text-ink-hi leading-none; }
+  .section-sub   { @apply text-base text-ink-lo mt-1.5; }
+
+  /* ── Type roles ─────────────────────────────────────────────────────── */
+
+  .eyebrow { @apply text-2xs font-bold uppercase tracking-[0.14em] text-accent; }
+  .label   { @apply text-2xs font-bold uppercase tracking-[0.12em] text-ink-lo; }
+  .meta    { @apply text-xs text-ink-lo font-mono; }
+
+  /* ── Surfaces ───────────────────────────────────────────────────────── */
+
+  .card       { @apply bg-surface border border-line rounded-2xl; }
+  .card-lift  { @apply card shadow-panel transition-colors duration-200 hover:border-line-strong; }
+  /* Header/footer strips inside a card — slightly raised off the card body. */
+  .card-strip { @apply bg-surface-raised border-line; }
+  /* Recessed well for media previews and code/JSON. */
+  .well       { @apply bg-surface-inset border border-line rounded-xl; }
+
+  /* ── Buttons ────────────────────────────────────────────────────────── */
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold text-base
+           px-5 py-3 transition-colors duration-150 whitespace-nowrap
+           disabled:opacity-45 disabled:pointer-events-none;
+  }
+  .btn-primary { @apply btn bg-accent text-accent-ink hover:bg-accent-hover; }
+  .btn-danger  { @apply btn bg-alert text-white hover:bg-alert-hover; }
+  .btn-ghost   { @apply btn bg-white/[0.04] border border-line text-ink-hi hover:bg-white/[0.08] hover:border-line-strong; }
+  .btn-outline { @apply btn border border-accent-line text-accent hover:bg-accent-soft; }
+  .btn-quiet   { @apply btn font-medium text-ink-lo hover:text-ink-hi hover:bg-white/5; }
+
+  .btn-sm { @apply px-3.5 py-2 text-sm rounded-lg gap-1.5; }
+  .btn-lg { @apply px-6 py-4 text-md; }
+  .btn-block { @apply w-full; }
+
+  /* ── Form controls ──────────────────────────────────────────────────── */
+
+  .field { @apply flex flex-col gap-2; }
+  .input {
+    @apply w-full bg-surface-inset border border-line rounded-xl px-4 py-3
+           text-base text-ink-hi placeholder:text-ink-faint
+           transition-colors duration-150 hover:border-line-strong focus:border-accent/60;
+  }
+  /* Read-only value styled to match .input so rows stay aligned. */
+  .input-static {
+    @apply w-full bg-surface-inset border border-line rounded-xl px-4 py-3
+           text-base text-ink flex items-center gap-2;
+  }
+
+  /* Segmented control (Verify's metadata-source picker). */
+  .segment {
+    @apply px-3.5 py-2 rounded-lg text-sm font-medium border transition-colors duration-150
+           border-line text-ink-lo hover:text-ink-hi hover:bg-white/5;
+  }
+  .segment-on { @apply bg-accent-soft border-accent-line text-accent hover:text-accent; }
+
+  /* ── Badges & pills ─────────────────────────────────────────────────── */
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border
+           text-2xs font-bold uppercase tracking-[0.1em];
+  }
+  .badge-neutral { @apply badge bg-white/5 border-line text-ink-lo; }
+  .badge-accent  { @apply badge bg-accent-soft border-accent-line text-accent; }
+  .badge-ok      { @apply badge bg-ok-soft border-ok-line text-ok; }
+  .badge-alert   { @apply badge bg-alert-soft border-alert-line text-alert; }
+  .badge-warn    { @apply badge bg-warn-soft border-warn-line text-warn; }
+
+  /* Rounded pill variant, used for page eyebrows and status chips. */
+  .pill         { @apply badge rounded-full px-3 py-1.5 tracking-[0.08em]; }
+  .pill-neutral { @apply pill bg-white/5    border-line       text-ink-lo; }
+  .pill-accent  { @apply pill bg-accent-soft border-accent-line text-accent; }
+  .pill-ok      { @apply pill bg-ok-soft     border-ok-line     text-ok; }
+  .pill-alert   { @apply pill bg-alert-soft  border-alert-line  text-alert; }
+  .pill-warn    { @apply pill bg-warn-soft   border-warn-line   text-warn; }
+
+  /* ── Callouts (info / warning / error strips) ───────────────────────── */
+
+  .callout { @apply flex items-start gap-3 px-4 py-3.5 rounded-xl border text-sm leading-relaxed; }
+  .callout-accent { @apply callout bg-accent-soft border-accent-line text-ink; }
+  .callout-ok     { @apply callout bg-ok-soft   border-ok-line   text-ink; }
+  .callout-warn   { @apply callout bg-warn-soft border-warn-line text-ink; }
+  .callout-alert  { @apply callout bg-alert-soft border-alert-line text-ink; }
+
+  /* ── Stats ──────────────────────────────────────────────────────────── */
+
+  .stat-label { @apply label block mb-2; }
+  .stat-value { @apply font-display text-2xl text-ink-hi leading-none; }
+
+  /* ── Scrollbars for overflowing dark panels ─────────────────────────── */
+
   .scrollbar-dark {
     scrollbar-width: thin;
-    scrollbar-color: rgba(34, 211, 238, 0.35) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
   }
-  .scrollbar-dark::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  .scrollbar-dark::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 8px;
-  }
+  .scrollbar-dark::-webkit-scrollbar { width: 10px; height: 10px; }
+  .scrollbar-dark::-webkit-scrollbar-track { background: transparent; }
   .scrollbar-dark::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(34, 211, 238, 0.4), rgba(34, 211, 238, 0.2));
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    transition: background 0.2s;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
   }
   .scrollbar-dark::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgba(34, 211, 238, 0.7), rgba(34, 211, 238, 0.4));
-    box-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
+    background: rgba(255, 255, 255, 0.26);
+    background-clip: content-box;
   }
-  .scrollbar-dark::-webkit-scrollbar-corner {
-    background: transparent;
+  .scrollbar-dark::-webkit-scrollbar-corner { background: transparent; }
+}
+
+@layer utilities {
+  /* Faint technical grid, used behind hero/diagram panels. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+    background-size: 28px 28px;
   }
 }

@@ -1,127 +1,142 @@
 import { Icon } from '@iconify/react'
 
 const TEAM = [
-  { name: '彭定康', id: 'D1229568', role: 'Embedder / Extractor',    initial: '彭' },
-  { name: '張志成', id: 'D1231400', role: 'Website / API',       initial: '張' },
-  { name: '吳尚恩', id: 'D1249268', role: 'Website / API',   initial: '吳' },
-  { name: '鄭建良', id: 'D1231150', role: 'Embedder / Extractor',      initial: '鄭' },
+  { name: '彭定康', id: 'D1229568', role: 'Embedder / Extractor', initial: '彭' },
+  { name: '張志成', id: 'D1231400', role: 'Website / API',        initial: '張' },
+  { name: '吳尚恩', id: 'D1249268', role: 'Website / API',        initial: '吳' },
+  { name: '鄭建良', id: 'D1231150', role: 'Embedder / Extractor', initial: '鄭' },
 ]
 
 const TECH = [
-  { cat: 'Watermarking',     items: ['LWT', 'DCT', 'SVD', 'QIM', 'BCH(15,7)', 'SHA-256'] },
-  { cat: 'Signal Processing',items: ['NumPy', 'OpenCV', 'PyWavelets', 'SciPy', 'galois', 'FFmpeg'] },
-  { cat: 'Backend / API',    items: ['FastAPI', 'Python', 'Supabase', 'REST API', 'JSON'] },
-  { cat: 'Frontend',         items: ['React', 'TypeScript', 'Vite', 'Tailwind CSS'] },
+  { cat: 'Watermarking',      items: ['LWT', 'DCT', 'SVD', 'QIM', 'BCH(15,7)', 'SHA-256'] },
+  { cat: 'Signal Processing', items: ['NumPy', 'OpenCV', 'PyWavelets', 'SciPy', 'galois', 'FFmpeg'] },
+  { cat: 'Backend / API',     items: ['FastAPI', 'Python', 'Supabase', 'REST API', 'JSON'] },
+  { cat: 'Frontend',          items: ['React', 'TypeScript', 'Vite', 'Tailwind CSS'] },
 ]
 
 const PHASES = [
-  { period: 'Mar – Apr', pct: '25%', title: 'Foundation', tasks: ['Dataset collection', 'Encoder + Decoder prototype'], s: 'done' },
-  { period: 'Apr – May', pct: '50%', title: 'Detection',  tasks: ['Tamper Detection module', 'Deepfake Detection integration'], s: 'active' },
-  { period: 'Jun – Jul', pct: '75%', title: 'Integration',tasks: ['Full system integration', 'Website + API development'], s: 'upcoming' },
-  { period: 'Jul – Sep', pct: '100%',title: 'Completion', tasks: ['Result packaging', 'Final evaluation', 'Demo deployment'], s: 'upcoming' },
+  { period: 'Mar – Apr', pct: '25%',  title: 'Foundation',  tasks: ['Dataset collection', 'Encoder + Decoder prototype'], s: 'done' },
+  { period: 'Apr – May', pct: '50%',  title: 'Detection',   tasks: ['Tamper Detection module', 'Deepfake Detection integration'], s: 'active' },
+  { period: 'Jun – Jul', pct: '75%',  title: 'Integration', tasks: ['Full system integration', 'Website + API development'], s: 'upcoming' },
+  { period: 'Jul – Sep', pct: '100%', title: 'Completion',  tasks: ['Result packaging', 'Final evaluation', 'Demo deployment'], s: 'upcoming' },
 ]
 
 const OBJECTIVES = [
-  { icon: 'lucide:lock',           title: 'Semi-Fragile Watermarking', desc: 'Survive normal compression and processing, but break under malicious manipulation.' },
-  { icon: 'lucide:scan',           title: 'Spatial Localization',      desc: 'Identify exactly which pixel regions in a frame were tampered with.' },
-  { icon: 'lucide:clock-4',        title: 'Temporal Verification',     desc: 'For video, detect which frames were altered and trace edits across the timeline.' },
-  { icon: 'lucide:network',        title: 'REST API Interface',        desc: 'Clean FastAPI backend with JSON responses for easy third-party integration.' },
+  { icon: 'lucide:lock',    title: 'Semi-fragile watermarking', desc: 'Survive normal compression and processing, but break under malicious manipulation.' },
+  { icon: 'lucide:scan',    title: 'Spatial localization',      desc: 'Identify exactly which pixel regions in a frame were tampered with.' },
+  { icon: 'lucide:clock-4', title: 'Temporal verification',     desc: 'For video, detect which frames were altered and trace edits across the timeline.' },
+  { icon: 'lucide:network', title: 'REST API interface',        desc: 'Clean FastAPI backend with JSON responses for easy third-party integration.' },
 ]
+
+const METHOD = [
+  {
+    step: '01',
+    title: 'Watermark embedding',
+    body: 'The Y (luminance) channel is decomposed by a 2-level Lifting Wavelet Transform; the LLLL sub-band is divided into 8×8 blocks, each transformed by DCT then SVD. The BCH(15,7)-coded payload bits — owner / media / frame / chain IDs — are embedded by Quantization Index Modulation on the largest singular value S₀, then the inverse transforms reconstruct the watermarked frame.',
+  },
+  {
+    step: '02',
+    title: 'Integrity verification',
+    body: 'Verification re-runs the LWT → 8×8 DCT → SVD chain on the Y channel, extracts payload bits via a QIM detector, and decodes them with BCH(15,7) + majority vote. The recovered owner / media / frame / chain IDs are matched against the stored record to confirm ownership and detect temporal anomalies (deleted, duplicated, or reordered frames).',
+  },
+  {
+    step: '03',
+    title: 'Tamper localization',
+    body: 'In parallel, the Cb chroma channel carries a fragile layer: a SHA-256 parity over (signature, frame_id) is embedded in the LSB of each 16×16 sub-block mean. During verification this parity is regenerated and compared per sub-block — any mismatch pinpoints the exact altered region, giving fine-grained spatial localization plus per-frame temporal analysis for video.',
+  },
+]
+
+const FLOW = [
+  { label: 'Original media',     icon: 'lucide:image',        active: false },
+  { label: 'LWT + DCT + SVD',    icon: 'lucide:cpu',          active: true  },
+  { label: 'Protected media',    icon: 'lucide:shield-check', active: false },
+  { label: 'QIM detector + BCH', icon: 'lucide:microscope',   active: true  },
+  { label: 'Tamper result',      icon: 'lucide:file-check-2', active: false },
+]
+
+/** Centred eyebrow + heading, repeated for each section. */
+function SectionHead({ eyebrow, title }: { eyebrow: string; title: string }) {
+  return (
+    <div className="text-center mb-12">
+      <p className="eyebrow mb-3">{eyebrow}</p>
+      <h2 className="font-display text-3xl text-ink-hi">{title}</h2>
+    </div>
+  )
+}
 
 export default function About() {
   return (
-    <div className="max-w-[1100px] mx-auto px-7 pb-32 relative z-10 font-sans text-slate-300">
-      
-      {/* Background Ambient Glows */}
-      <div className="absolute top-[5%] left-[10%] w-[30%] h-[20%] bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
-      <div className="absolute top-[40%] right-[10%] w-[30%] h-[20%] bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
+    <div className="page pb-8">
 
-      {/* Page header */}
-      <div className="text-center pt-20 pb-16">
-        <h1 className="font-display text-[clamp(2.5rem,5vw,4rem)] text-white font-semibold mb-6 tracking-tight">
-          About <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">Aegis</span>
+      {/* ── Header ── */}
+      <header className="text-center pt-20 pb-16 max-w-2xl mx-auto">
+        <h1 className="page-title mb-5">
+          About <span className="text-accent">Aegis</span>
         </h1>
-        <p className="text-slate-400 text-[1.1rem] max-w-2xl mx-auto leading-relaxed">
-          Multimedia tamper detection using invisible semi-fragile watermarking with LWT + DCT + SVD payload encoding and per-sub-block parity localization.
+        <p className="page-lead">
+          Multimedia tamper detection using invisible semi-fragile watermarking with
+          LWT + DCT + SVD payload encoding and per-sub-block parity localization.
         </p>
-      </div>
+      </header>
 
       {/* ── Background ── */}
       <section className="mb-24">
-        <div className="bg-[#111318]/80 backdrop-blur-xl border border-white/5 rounded-3xl p-8 lg:p-12 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center shadow-2xl relative overflow-hidden">
-          
-          {/* Subtle Grid Background */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+CjxyZWN0IHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0ibm9uZSIvPgo8Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIvPgo8L3N2Zz4=')] opacity-50 pointer-events-none" />
-
-          <div className="relative z-10">
-            <p className="text-[11px] font-bold tracking-widest uppercase text-cyan-400 mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" />
-              Project Background
+        <div className="card p-8 lg:p-12 grid grid-cols-1 lg:grid-cols-2 gap-14 items-center">
+          <div>
+            <p className="eyebrow mb-4">Project background</p>
+            <h2 className="font-display text-2xl text-ink-hi mb-5 leading-snug">
+              Why proactive tamper detection matters
+            </h2>
+            <p className="text-base text-ink-lo leading-relaxed mb-4">
+              With the rapid advancement of AI technologies such as generative deepfakes,
+              digital images and videos can be manipulated with unprecedented ease. Fake
+              content spreads misinformation, undermines trust, and can have devastating
+              legal, medical, and social consequences.
             </p>
-            <h2 className="text-3xl font-semibold text-white mb-6 leading-tight">Why proactive tamper detection matters</h2>
-            <p className="text-slate-400 text-[14.5px] leading-relaxed mb-5">
-              With the rapid advancement of AI technologies such as generative deepfakes, digital images and videos
-              can be manipulated with unprecedented ease. Fake content spreads misinformation, undermines
-              trust, and can have devastating legal, medical, and social consequences.
-            </p>
-            <p className="text-slate-400 text-[14.5px] leading-relaxed">
-              Existing passive detection methods struggle with accuracy and rarely pinpoint exactly which
-              pixels were altered. Our approach uses a <strong className="text-white font-medium">proactive</strong> strategy —
-              embedding an imperceptible semi-fragile watermark <em>before</em> content is distributed.
+            <p className="text-base text-ink-lo leading-relaxed">
+              Existing passive detection methods struggle with accuracy and rarely pinpoint
+              exactly which pixels were altered. Our approach uses a{' '}
+              <strong className="text-ink-hi font-medium">proactive</strong> strategy —
+              embedding an imperceptible semi-fragile watermark <em>before</em> content is
+              distributed.
             </p>
           </div>
 
-          {/* Animated Pipeline Diagram */}
-          <div className="relative z-10 flex flex-col items-center">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">System Architecture Flow</p>
-            
-            <div className="w-full max-w-[320px] flex flex-col relative">
-              {/* Connecting line behind blocks */}
-              <div className="absolute left-1/2 top-4 bottom-4 w-[2px] -translate-x-1/2 bg-gradient-to-b from-white/10 via-cyan-500/50 to-emerald-500/50 -z-10" />
-              
-              {/* Animated data packet */}
-              <div className="absolute left-1/2 top-0 w-2 h-8 -translate-x-1/2 bg-cyan-400 blur-[2px] rounded-full z-0 animate-[scan_3s_ease-in-out_infinite]" />
-
-              <style>{`
-                @keyframes scan {
-                  0% { top: 5%; opacity: 0; }
-                  20% { opacity: 1; }
-                  80% { opacity: 1; }
-                  100% { top: 95%; opacity: 0; }
-                }
-              `}</style>
-
-              {[
-                { label: 'Original Media',      icon: 'lucide:image',         color: 'bg-[#0a0a0c] border-white/10 text-slate-300' },
-                { label: 'LWT + DCT + SVD',     icon: 'lucide:cpu',           color: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]' },
-                { label: 'Protected Media',     icon: 'lucide:shield-check',  color: 'bg-[#0a0a0c] border-white/10 text-slate-300' },
-                { label: 'QIM Detector + BCH',  icon: 'lucide:microscope',    color: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]' },
-                { label: 'Tamper Result',       icon: 'lucide:file-check-2',  color: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' },
-              ].map((node, i) => (
-                <div key={i} className={`relative z-10 w-full px-5 py-4 border rounded-2xl flex items-center justify-center gap-3 text-[14px] font-medium backdrop-blur-md mb-4 last:mb-0 transition-transform hover:scale-[1.02] ${node.color}`}>
-                  <Icon icon={node.icon} width="18" className="opacity-80" />
-                  {node.label}
-                </div>
+          {/* Pipeline diagram */}
+          <div className="flex flex-col items-center">
+            <p className="label mb-6">System architecture flow</p>
+            <ol className="w-full max-w-[300px] flex flex-col gap-2.5">
+              {FLOW.map((node, i) => (
+                <li key={node.label}>
+                  <div className={`w-full px-4 py-3 border rounded-xl flex items-center gap-3 text-base
+                    ${node.active
+                      ? 'bg-accent-soft border-accent-line text-accent'
+                      : 'bg-surface-inset border-line text-ink'}`}>
+                    <Icon icon={node.icon} width="17" className="shrink-0" />
+                    {node.label}
+                  </div>
+                  {i < FLOW.length - 1 && (
+                    <div className="h-2.5 w-px bg-line mx-auto my-0.5" />
+                  )}
+                </li>
               ))}
-            </div>
+            </ol>
           </div>
         </div>
       </section>
 
       {/* ── Objectives ── */}
       <section className="mb-24">
-        <div className="flex flex-col items-center text-center mb-12">
-          <p className="text-[11px] font-bold tracking-widest uppercase text-cyan-400 mb-3">Core Objectives</p>
-          <h2 className="text-3xl font-semibold text-white">What we set out to build</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {OBJECTIVES.map((o, i) => (
-            <div key={i} className="bg-[#111318] border border-white/5 rounded-3xl p-8 hover:border-cyan-500/30 hover:shadow-[0_0_30px_rgba(34,211,238,0.05)] transition-all group">
-              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center text-cyan-400 mb-6 group-hover:bg-cyan-500/10 group-hover:scale-110 transition-all">
-                <Icon icon={o.icon} width="24" />
-              </div>
-              <h3 className="text-[16px] font-medium text-white mb-3">{o.title}</h3>
-              <p className="text-slate-400 text-[13px] leading-relaxed">{o.desc}</p>
+        <SectionHead eyebrow="Core objectives" title="What we set out to build" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {OBJECTIVES.map(o => (
+            <div key={o.title} className="card-lift p-6">
+              <span className="w-11 h-11 rounded-xl bg-white/[0.04] border border-line text-accent
+                               flex items-center justify-center mb-5">
+                <Icon icon={o.icon} width="21" />
+              </span>
+              <h3 className="text-base font-medium text-ink-hi mb-2">{o.title}</h3>
+              <p className="text-sm text-ink-lo leading-relaxed">{o.desc}</p>
             </div>
           ))}
         </div>
@@ -129,53 +144,29 @@ export default function About() {
 
       {/* ── Methodology ── */}
       <section className="mb-24">
-        <div className="flex flex-col items-center text-center mb-12">
-          <p className="text-[11px] font-bold tracking-widest uppercase text-cyan-400 mb-3">Methodology</p>
-          <h2 className="text-3xl font-semibold text-white">Technical Approach</h2>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {[
-            {
-              step: '01',
-              title: 'Watermark Embedding',
-              body: 'The Y (luminance) channel is decomposed by a 2-level Lifting Wavelet Transform; the LLLL sub-band is divided into 8×8 blocks, each transformed by DCT then SVD. The BCH(15,7)-coded payload bits — owner / media / frame / chain IDs — are embedded by Quantization Index Modulation on the largest singular value S₀, then the inverse transforms reconstruct the watermarked frame.',
-            },
-            {
-              step: '02',
-              title: 'Integrity Verification',
-              body: 'Verification re-runs the LWT → 8×8 DCT → SVD chain on the Y channel, extracts payload bits via a QIM detector, and decodes them with BCH(15,7) + majority vote. The recovered owner / media / frame / chain IDs are matched against the stored record to confirm ownership and detect temporal anomalies (deleted, duplicated, or reordered frames).',
-            },
-            {
-              step: '03',
-              title: 'Tamper Localization',
-              body: 'In parallel, the Cb chroma channel carries a fragile layer: a SHA-256 parity over (signature, frame_id) is embedded in the LSB of each 16×16 sub-block mean. During verification this parity is regenerated and compared per sub-block — any mismatch pinpoints the exact altered region, giving fine-grained spatial localization plus per-frame temporal analysis for video.',
-            },
-          ].map((m, i) => (
-            <div key={i} className="bg-[#111318] border border-white/5 border-t-[3px] border-t-cyan-500 rounded-3xl p-8 hover:-translate-y-1 transition-transform shadow-lg">
-              <div className="text-[10px] font-bold text-cyan-500 mb-4 bg-cyan-500/10 inline-block px-3 py-1 rounded-full uppercase tracking-widest">Phase {m.step}</div>
-              <h3 className="text-[18px] font-medium text-white mb-4">{m.title}</h3>
-              <p className="text-slate-400 text-[14px] leading-relaxed">{m.body}</p>
+        <SectionHead eyebrow="Methodology" title="Technical approach" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {METHOD.map(m => (
+            <div key={m.step} className="card-lift p-6">
+              <span className="font-mono text-2xs text-accent block mb-4">Phase {m.step}</span>
+              <h3 className="text-lg font-medium text-ink-hi mb-3">{m.title}</h3>
+              <p className="text-sm text-ink-lo leading-relaxed">{m.body}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── Tech Stack ── */}
+      {/* ── Tech stack ── */}
       <section className="mb-24">
-        <div className="flex flex-col items-center text-center mb-12">
-          <p className="text-[11px] font-bold tracking-widest uppercase text-cyan-400 mb-3">Engineering</p>
-          <h2 className="text-3xl font-semibold text-white">Tech Stack</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {TECH.map((t, i) => (
-            <div key={i} className="bg-[#111318] border border-white/5 rounded-3xl p-6 hover:bg-white/[0.02] transition-colors">
-              <h4 className="text-[14px] font-medium text-white mb-5 flex items-center gap-2">
-                <div className="w-1.5 h-4 bg-cyan-400 rounded-full" />
-                {t.cat}
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {t.items.map((item, j) => (
-                  <span key={j} className="px-3 py-1.5 bg-[#0a0a0c] border border-white/10 text-slate-300 text-[12px] rounded-lg shadow-sm">
+        <SectionHead eyebrow="Engineering" title="Tech stack" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {TECH.map(t => (
+            <div key={t.cat} className="card p-5">
+              <h3 className="label mb-4">{t.cat}</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {t.items.map(item => (
+                  <span key={item} className="px-2.5 py-1 bg-surface-inset border border-line
+                                              text-xs font-mono text-ink rounded-lg">
                     {item}
                   </span>
                 ))}
@@ -187,86 +178,66 @@ export default function About() {
 
       {/* ── Timeline ── */}
       <section className="mb-24">
-        <div className="flex flex-col items-center text-center mb-16">
-          <p className="text-[11px] font-bold tracking-widest uppercase text-cyan-400 mb-3">Roadmap</p>
-          <h2 className="text-3xl font-semibold text-white">Project Timeline</h2>
-        </div>
-        <div className="max-w-3xl mx-auto flex flex-col gap-0">
+        <SectionHead eyebrow="Roadmap" title="Project timeline" />
+        <ol className="max-w-3xl mx-auto">
           {PHASES.map((phase, i) => {
-            const isDone = phase.s === 'done';
-            const isActive = phase.s === 'active';
-            const isUpcoming = phase.s === 'upcoming';
-            
+            const isDone   = phase.s === 'done'
+            const isActive = phase.s === 'active'
             return (
-              <div key={i} className="grid grid-cols-[40px_1fr] gap-6 items-start relative group">
-                
-                {/* Indicator */}
-                <div className="flex flex-col items-center pt-8 h-full">
-                  <div className={`w-4 h-4 rounded-full border-2 z-10 flex-shrink-0 transition-all duration-300
-                    ${isDone   ? 'bg-emerald-400 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)]' :
-                      isActive ? 'bg-cyan-400 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.6)] animate-pulse' :
-                      'bg-[#111318] border-white/20'}`} 
-                  />
-                  {i < PHASES.length - 1 && (
-                    <div className={`w-[2px] flex-1 min-h-[40px] mt-2 rounded-full
-                      ${isDone ? 'bg-gradient-to-b from-emerald-400 to-cyan-400' : 
-                        isActive ? 'bg-gradient-to-b from-cyan-400 to-white/10 border-dashed' : 
-                        'bg-white/10'}`} 
-                    />
-                  )}
+              <li key={phase.title} className="grid grid-cols-[16px_1fr] gap-5">
+                {/* Rail */}
+                <div className="flex flex-col items-center">
+                  <span className={`w-3 h-3 rounded-full mt-6 shrink-0 border
+                    ${isDone   ? 'bg-ok border-ok' :
+                      isActive ? 'bg-accent border-accent shadow-glow-accent' :
+                                 'bg-surface border-line-strong'}`} />
+                  {i < PHASES.length - 1 && <span className="w-px flex-1 bg-line my-1.5" />}
                 </div>
 
                 {/* Content */}
-                <div className={`bg-[#111318] border border-white/5 rounded-3xl p-6 mb-6 transition-all duration-300
-                  ${isUpcoming ? 'opacity-50 hover:opacity-100' : 'hover:border-white/20 hover:shadow-xl'}
-                  ${isActive ? 'border-cyan-500/30 bg-cyan-500/[0.02]' : ''}`}>
-                  
-                  <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
-                    <span className="text-[13px] text-slate-400 font-mono tracking-wide">{phase.period}</span>
-                    <span className={`px-3 py-1 text-[11px] font-bold tracking-widest uppercase rounded-lg border
-                      ${isDone   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                        isActive ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' :
-                        'bg-white/5 text-slate-500 border-white/10'}`}>
-                      {phase.pct} Complete
+                <div className={`card p-5 mb-4 ${isActive ? 'border-accent-line' : ''} ${phase.s === 'upcoming' ? 'opacity-60' : ''}`}>
+                  <div className="flex items-center justify-between gap-3 mb-3.5 pb-3.5 border-b border-line">
+                    <span className="meta">{phase.period}</span>
+                    <span className={isDone ? 'badge-ok' : isActive ? 'badge-accent' : 'badge-neutral'}>
+                      {phase.pct} complete
                     </span>
                   </div>
-                  <h4 className={`text-[18px] font-medium mb-4 ${isDone || isActive ? 'text-white' : 'text-slate-300'}`}>{phase.title}</h4>
-                  <ul className="flex flex-col gap-2.5">
-                    {phase.tasks.map((t, j) => (
-                      <li key={j} className="flex items-start gap-3 text-[14px] text-slate-400">
-                        <Icon icon={isDone ? "lucide:check-circle-2" : isActive ? "lucide:circle-dashed" : "lucide:circle"} 
-                              className={`shrink-0 mt-0.5 ${isDone ? 'text-emerald-400' : isActive ? 'text-cyan-400' : 'text-slate-600'}`} width="16" />
+                  <h3 className="text-lg font-medium text-ink-hi mb-3">{phase.title}</h3>
+                  <ul className="flex flex-col gap-2">
+                    {phase.tasks.map(t => (
+                      <li key={t} className="flex items-start gap-2.5 text-sm text-ink-lo">
+                        <Icon
+                          icon={isDone ? 'lucide:check-circle-2' : isActive ? 'lucide:circle-dashed' : 'lucide:circle'}
+                          className={`shrink-0 mt-0.5 ${isDone ? 'text-ok' : isActive ? 'text-accent' : 'text-ink-faint'}`}
+                          width="15" />
                         {t}
                       </li>
                     ))}
                   </ul>
                 </div>
-              </div>
+              </li>
             )
           })}
-        </div>
+        </ol>
       </section>
 
       {/* ── Team ── */}
       <section>
-        <div className="flex flex-col items-center text-center mb-16">
-          <p className="text-[11px] font-bold tracking-widest uppercase text-cyan-400 mb-3">The Team</p>
-          <h2 className="text-3xl font-semibold text-white">Meet the Developers</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {TEAM.map((m, i) => (
-            <div key={i} className="bg-[#111318] border border-white/5 rounded-3xl p-8 text-center hover:-translate-y-2 hover:border-cyan-500/30 hover:shadow-[0_10px_40px_-10px_rgba(34,211,238,0.15)] transition-all duration-300 group">
-              <div className="w-16 h-16 bg-gradient-to-br from-cyan-400 to-emerald-400 text-[#0a0a0c] rounded-2xl flex items-center justify-center font-display text-[1.5rem] font-bold mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform">
+        <SectionHead eyebrow="The team" title="Meet the developers" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {TEAM.map(m => (
+            <div key={m.id} className="card-lift p-6 text-center">
+              <span className="w-14 h-14 rounded-2xl bg-accent-soft border border-accent-line text-accent
+                               flex items-center justify-center font-display text-2xl mx-auto mb-5">
                 {m.initial}
-              </div>
-              <div className="font-medium text-white text-[18px] mb-1">{m.name}</div>
-              <div className="font-mono text-[12px] text-cyan-400 mb-3 bg-cyan-400/10 inline-block px-2 py-0.5 rounded">{m.id}</div>
-              <div className="text-[13px] text-slate-400 leading-snug">{m.role}</div>
+              </span>
+              <div className="text-lg font-medium text-ink-hi mb-1.5">{m.name}</div>
+              <div className="meta mb-2.5">{m.id}</div>
+              <div className="text-sm text-ink-lo">{m.role}</div>
             </div>
           ))}
         </div>
       </section>
-
     </div>
   )
 }

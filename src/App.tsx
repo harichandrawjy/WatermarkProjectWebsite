@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Navbar from './components/Navbar'
+import Footer from './components/Footer'
 import Home from './pages/Home'
 import Encode from './pages/Encode'
 import Verify from './pages/Verify'
@@ -104,24 +105,26 @@ function AppShell() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0c] text-slate-300 font-sans selection:bg-cyan-500/30">
+    <div className="min-h-screen flex flex-col">
 
-        <Navbar currentPage={page} navigate={navigate} />
+      <Navbar currentPage={page} navigate={navigate} />
 
-        {/* Home stretches edge-to-edge under the transparent navbar; other
-            pages get pt-[72px] so the fixed nav doesn't cover their content. */}
-        <main className={`flex-1 ${page === 'home' ? '' : 'pt-[72px]'}`}>
-          {page === 'home'      && <Home navigate={navigate} />}
-          {page === 'encode'    && <Encode navigate={navigate} />}
-          {page === 'verify'    && <Verify onComplete={handleVerifyComplete} />}
-          {page === 'results'   && <Results result={result} navigate={navigate} />}
-          {page === 'about'     && <About />}
-          {page === 'login'     && <Login navigate={navigate} />}
-          {page === 'register'  && <Register navigate={navigate} />}
-          {page === 'dashboard' && <Dashboard navigate={navigate} />}
-          {page === 'forgot'    && <ForgotPassword navigate={navigate} />}
-        </main>
+      {/* Home stretches edge-to-edge under the transparent navbar; other
+          pages get pt-16 so the fixed nav doesn't cover their content.
+          `key` restarts the enter animation on every navigation. */}
+      <main key={page} className={`flex-1 animate-fade-in ${page === 'home' ? '' : 'pt-16'}`}>
+        {page === 'home'      && <Home navigate={navigate} />}
+        {page === 'encode'    && <Encode navigate={navigate} />}
+        {page === 'verify'    && <Verify onComplete={handleVerifyComplete} />}
+        {page === 'results'   && <Results result={result} navigate={navigate} />}
+        {page === 'about'     && <About />}
+        {page === 'login'     && <Login navigate={navigate} />}
+        {page === 'register'  && <Register navigate={navigate} />}
+        {page === 'dashboard' && <Dashboard navigate={navigate} />}
+        {page === 'forgot'    && <ForgotPassword navigate={navigate} />}
+      </main>
 
+      <Footer navigate={navigate} />
     </div>
   )
 }

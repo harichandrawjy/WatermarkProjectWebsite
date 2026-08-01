@@ -40,6 +40,14 @@ const DETECT_ITEMS = [
   'Pixel-level manipulation',
 ]
 
+const REPORT_ITEMS = [
+  { icon: 'lucide:badge-check',    text: 'Authentic / tampered verdict with confidence score' },
+  { icon: 'lucide:map-pin',        text: 'Exact spatial pixel regions that were altered' },
+  { icon: 'lucide:film',           text: 'Per-frame timeline analysis for video files' },
+  { icon: 'lucide:activity',       text: 'Visual sub-block parity mismatch heatmap' },
+  { icon: 'lucide:download-cloud', text: 'Downloadable structured JSON report' },
+]
+
 export default function Verify({ onComplete }: VerifyProps) {
   const { token, authedFetch } = useAuth()
   const [stage,        setStage]        = useState<Stage>('idle')
@@ -284,189 +292,176 @@ export default function Verify({ onComplete }: VerifyProps) {
   }
 
   return (
-    <div className="max-w-[1100px] mx-auto px-7 pb-20 relative z-10 font-sans text-slate-300">
+    <div className="page pb-8">
 
-      {/* Background Ambient Glow */}
-      <div className="absolute top-[10%] left-[60%] w-[40%] h-[30%] bg-rose-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
-
-      {/* Header */}
-      <div className="text-center pt-16 pb-12">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[12px] font-semibold rounded-full mb-5 backdrop-blur-md">
-          <Icon icon="lucide:shield-alert" width="16" />
-          Step 2 — Integrity Verification
-        </div>
-        <h1 className="font-display text-[clamp(2.2rem,5vw,3.4rem)] text-white font-normal mb-4 leading-tight tracking-tight">Verify Integrity</h1>
-        <p className="text-slate-400 text-[1.05rem] max-w-lg mx-auto leading-relaxed">
+      {/* ── Header ── */}
+      <header className="pt-16 pb-12 max-w-2xl">
+        <span className="pill-accent mb-5">
+          <Icon icon="lucide:scan-search" width="13" />
+          Step 2 — integrity verification
+        </span>
+        <h1 className="page-title mb-4">Verify integrity</h1>
+        <p className="page-lead">
           Upload your watermarked image or video. We'll extract the embedded payload and
-          compare per-sub-block parity to detect exactly where and when any malicious tampering occurred.
+          compare per-sub-block parity to detect exactly where and when any malicious
+          tampering occurred.
         </p>
-      </div>
+      </header>
 
-      {/* How it works strip */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+      {/* ── Progress rail ── */}
+      <ol className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5 pb-12 mb-12 border-b border-line">
         {[
-          { n: '01', title: 'Upload media', desc: 'The previously protected file' },
-          { n: '02', title: 'Extract & Verify',     desc: 'Decoder checks pixel regions' },
-          { n: '03', title: 'Review Report',     desc: 'View localized tampering data' },
-        ].map((s, i) => (
-          <div key={i} className="bg-[#111318]/80 backdrop-blur-sm border border-white/5 rounded-2xl px-5 py-4 flex items-center gap-4">
-            <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center text-[12px] font-bold shrink-0 shadow-[0_0_10px_rgba(244,63,94,0.1)]">{s.n}</div>
+          { n: '01', title: 'Upload media',     desc: 'The previously protected file' },
+          { n: '02', title: 'Extract & verify', desc: 'Decoder checks pixel regions' },
+          { n: '03', title: 'Review report',    desc: 'View localized tampering data' },
+        ].map(s => (
+          <li key={s.n} className="flex items-start gap-3.5">
+            <span className="font-mono text-2xs text-accent pt-0.5">{s.n}</span>
             <div>
-              <div className="font-medium text-white text-[13.5px] mb-0.5">{s.title}</div>
-              <div className="text-[12px] text-slate-400">{s.desc}</div>
+              <div className="text-base font-medium text-ink-hi">{s.title}</div>
+              <div className="text-sm text-ink-lo">{s.desc}</div>
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_296px] gap-6 items-start">
 
-        {/* Main area */}
-        <div className="w-full">
+        {/* ── Main area ── */}
+        <div className="min-w-0">
 
           {stage === 'verifying' ? (
-            /* ── VERIFYING progress ── */
-            <div className="bg-[#111318] border border-white/5 rounded-3xl p-12 flex flex-col items-center gap-6 text-center relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-64 h-64 bg-rose-500/10 rounded-full blur-[80px] -ml-20 -mt-20 pointer-events-none" />
-
-              <div className="relative w-16 h-16 flex items-center justify-center mb-2">
-                <div className="absolute inset-0 border-[3px] border-white/5 border-t-rose-400 rounded-full animate-spin" />
-                <div className="absolute inset-2 border-[3px] border-white/5 border-b-amber-400 rounded-full animate-spin-slow opacity-70" />
+            /* ── VERIFYING ── */
+            <div className="card p-12 flex flex-col items-center gap-6 text-center">
+              <div className="relative w-14 h-14 flex items-center justify-center">
+                <span className="absolute inset-0 rounded-full border-2 border-line border-t-accent animate-spin" />
+                <span className="absolute inset-2.5 rounded-full border-2 border-line border-b-accent/50 animate-spin-slow" />
               </div>
 
               <div>
-                <h3 className="font-display text-[1.8rem] text-white font-normal mb-1">Analyzing Media</h3>
-                <p className="text-rose-400 text-[14px] font-medium min-h-[20px]">{VERIFY_STEPS[stepIdx]}</p>
+                <h2 className="font-display text-2xl text-ink-hi mb-1.5">Analyzing media</h2>
+                <p className="text-base text-accent font-mono min-h-[24px]">{VERIFY_STEPS[stepIdx]}</p>
               </div>
 
               {/* Indeterminate progress bar + real elapsed clock. */}
-              <div className="w-full max-w-sm mt-2">
-                <div className="flex justify-between text-[12px] font-bold text-slate-400 mb-2">
-                  <span>Working...</span>
-                  <span className="text-white font-mono">
+              <div className="w-full max-w-sm">
+                <div className="flex justify-between text-2xs mb-2">
+                  <span className="label">Working</span>
+                  <span className="font-mono text-ink-hi">
                     {String(Math.floor(progress / 60)).padStart(2, '0')}:{String(progress % 60).padStart(2, '0')}
                   </span>
                 </div>
-                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
-                  <div className="h-full w-2/5 bg-gradient-to-r from-rose-500 via-amber-400 to-rose-500 rounded-full shadow-[0_0_10px_rgba(244,63,94,0.5)] animate-indeterminate" />
+                <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                  <div className="h-full w-2/5 bg-accent rounded-full animate-indeterminate" />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 w-full max-w-sm mt-6 text-left border-t border-white/5 pt-6">
-                {VERIFY_STEPS.map((s, i) => {
-                  const isCurrent = i === stepIdx
-                  return (
-                    <div key={i} className={`flex items-center gap-3 text-[13px] transition-colors duration-300
-                      ${isCurrent ? 'text-white font-medium' : 'text-slate-600'}`}>
-                      <span className="w-5 shrink-0 flex justify-center">
-                        {isCurrent
-                          ? <span className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e] animate-pulse" />
-                          : <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
-                      </span>
-                      {s}
-                    </div>
-                  )
-                })}
-              </div>
+              <ol className="flex flex-col gap-2.5 w-full max-w-sm mt-4 pt-6 border-t border-line text-left">
+                {VERIFY_STEPS.map((s, i) => (
+                  <li key={s} className={`flex items-center gap-3 text-sm transition-colors duration-300
+                    ${i === stepIdx ? 'text-ink-hi' : 'text-ink-faint'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 transition-colors duration-300
+                      ${i === stepIdx ? 'bg-accent' : 'bg-white/15'}`} />
+                    {s}
+                  </li>
+                ))}
+              </ol>
             </div>
 
           ) : stage === 'error' ? (
             /* ── ERROR ── */
-            <div className="bg-[#111318] border border-rose-500/30 rounded-3xl p-10 flex flex-col items-center text-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center">
-                <Icon icon="lucide:alert-octagon" width="24" />
-              </div>
+            <div className="card border-alert-line p-10 flex flex-col items-center text-center gap-4">
+              <span className="w-12 h-12 rounded-xl bg-alert-soft border border-alert-line text-alert
+                               flex items-center justify-center">
+                <Icon icon="lucide:alert-octagon" width="22" />
+              </span>
               <div>
-                <h3 className="font-display text-[1.4rem] text-white mb-1">Verification failed</h3>
-                <p className="text-[13px] text-rose-300/80 max-w-md break-words">{errorMsg || 'Unknown error'}</p>
+                <h2 className="font-display text-xl text-ink-hi mb-1.5">Verification failed</h2>
+                <p className="text-sm text-ink-lo max-w-md break-words font-mono">{errorMsg || 'Unknown error'}</p>
               </div>
-              <button onClick={reset} className="px-6 py-3 border border-white/10 text-white font-medium rounded-xl hover:bg-white/5 transition-all text-[14px]">
-                Try Again
-              </button>
+              <button onClick={reset} className="btn-ghost">Try again</button>
             </div>
 
           ) : stage === 'preview' && file ? (
-            /* ── PREVIEW before verifying ── */
-            <div className="bg-[#111318] border border-white/10 rounded-3xl overflow-hidden shadow-xl">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 gap-3 bg-white/[0.02]">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Icon icon="lucide:file-search" className="text-slate-400" width="18" />
-                  <span className="font-medium text-[14px] text-white">{file.name}</span>
-                  <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-slate-300 text-[10px] uppercase tracking-widest font-bold rounded-md">
-                    {file.type.startsWith('video/') ? 'Video' : 'Image'}
-                  </span>
-                  <span className="text-[12px] text-slate-500 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+            /* ── PREVIEW ── */
+            <div className="card overflow-hidden animate-fade-up">
+              <div className="card-strip border-b flex items-center justify-between gap-3 px-5 py-3.5">
+                <div className="flex items-center gap-3 flex-wrap min-w-0">
+                  <Icon icon="lucide:file-search" className="text-ink-lo shrink-0" width="17" />
+                  <span className="text-base font-medium text-ink-hi truncate">{file.name}</span>
+                  <span className="badge-neutral">{file.type.startsWith('video/') ? 'Video' : 'Image'}</span>
+                  <span className="meta">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
-                <button onClick={reset}
-                  className="text-[13px] text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
+                <button onClick={reset} className="btn-quiet btn-sm shrink-0 hover:text-alert">
                   <Icon icon="lucide:x" width="14" /> Remove
                 </button>
               </div>
 
-              <div className="bg-[#0a0a0c] p-6 flex justify-center border-b border-white/5">
+              <div className="bg-surface-inset p-6 flex justify-center border-b border-line">
                 {preview && (
                   file.type.startsWith('video/')
-                    ? <video className="w-full max-h-[400px] object-contain rounded-lg border border-white/10 shadow-2xl" src={preview} controls />
-                    : <img   className="w-full max-h-[400px] object-contain rounded-lg border border-white/10 shadow-2xl" src={preview} alt="preview" />
+                    ? <video className="w-full max-h-[380px] object-contain rounded-lg" src={preview} controls />
+                    : <img   className="w-full max-h-[380px] object-contain rounded-lg" src={preview} alt="preview" />
                 )}
               </div>
 
-              {/* Metadata source picker */}
-              <div className="p-6 border-b border-white/5">
-                <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 block">Encode Metadata Source</label>
+              {/* ── Metadata source ── */}
+              <div className="p-6 border-b border-line">
+                <p className="label mb-3">Encode metadata source</p>
                 <div className="flex gap-2 flex-wrap mb-4">
                   {[
-                    { k: 'auto' as const, label: 'Auto (Database)',     disabled: false },
-                    { k: 'id'   as const, label: 'Specific ID / History', disabled: false },
-                    { k: 'file' as const, label: 'Upload JSON',         disabled: false },
+                    { k: 'auto' as const, label: 'Auto (database)' },
+                    { k: 'id'   as const, label: 'Specific ID / history' },
+                    { k: 'file' as const, label: 'Upload JSON' },
                   ].map(o => (
                     <button
                       key={o.k}
                       type="button"
-                      disabled={o.disabled}
                       onClick={() => setMetaSource(o.k)}
-                      className={`px-4 py-2 rounded-lg text-[12.5px] font-medium border transition-all
-                        ${metaSource === o.k
-                          ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
-                          : 'border-white/10 text-slate-400 hover:bg-white/5'}
-                        ${o.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                      className={`segment ${metaSource === o.k ? 'segment-on' : ''}`}>
                       {o.label}
                     </button>
                   ))}
                 </div>
 
                 {metaSource === 'auto' && (
-                  <div className="text-[12.5px]">
+                  <>
                     {autoLooking ? (
-                      <p className="text-amber-400 flex items-center gap-2">
+                      <p className="text-sm text-warn flex items-center gap-2">
                         <Icon icon="lucide:loader-2" width="14" className="animate-spin" />
                         Searching database for matching record...
                       </p>
                     ) : autoFound === true ? (
-                      <div className="px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start gap-3">
-                        <Icon icon="lucide:database" width="16" className="text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="callout-ok">
+                        <Icon icon="lucide:database" width="15" className="text-ok shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-emerald-400 font-medium mb-1">Record found in database</p>
+                          <p className="text-ok font-medium mb-1">Record found in database</p>
                           {metaInfo && (
-                            <p className="text-slate-400">
-                              Owner: <span className="text-white font-mono">{metaInfo.owner || '—'}</span>
-                              {' · '}Media ID: <span className="text-white font-mono">{metaInfo.mediaId || '—'}</span>
+                            <p className="text-ink-lo font-mono text-xs break-all">
+                              owner <span className="text-ink-hi">{metaInfo.owner || '—'}</span>
+                              {' · '}media <span className="text-ink-hi">{metaInfo.mediaId || '—'}</span>
                             </p>
                           )}
                         </div>
                       </div>
                     ) : autoFound === false ? (
-                      <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
-                        <Icon icon="lucide:alert-triangle" width="16" className="text-amber-400 shrink-0 mt-0.5" />
+                      <div className="callout-warn">
+                        <Icon icon="lucide:alert-triangle" width="15" className="text-warn shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-amber-400 font-medium mb-1">No matching record found</p>
-                          <p className="text-slate-400">This file may not be in the database. Try <strong className="text-white">Specific ID</strong> or <strong className="text-white">Upload JSON</strong> instead.</p>
+                          <p className="text-warn font-medium mb-1">No matching record found</p>
+                          <p className="text-ink-lo">
+                            This file may not be in the database. Try{' '}
+                            <strong className="text-ink-hi font-medium">Specific ID</strong> or{' '}
+                            <strong className="text-ink-hi font-medium">Upload JSON</strong> instead.
+                          </p>
                         </div>
                       </div>
                     ) : (
-                      <p className="text-slate-400">Upload a file above — we'll automatically search the database for its metadata.</p>
+                      <p className="text-sm text-ink-lo">
+                        Upload a file above — we'll automatically search the database for its metadata.
+                      </p>
                     )}
-                  </div>
+                  </>
                 )}
 
                 {metaSource === 'id' && (
@@ -480,14 +475,15 @@ export default function Verify({ onComplete }: VerifyProps) {
                       placeholder={token
                         ? 'Search your encode history or paste an ID...'
                         : 'Encode ID (e.g. abc123)'}
-                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white placeholder-slate-600 focus:outline-none focus:border-rose-500/50 transition-colors font-mono"
+                      className="input font-mono"
                     />
 
                     {/* Searchable history dropdown — only when logged in and
                         there's something to show.  Click an item to fill the
                         input with its encode ID. */}
                     {historyOpen && token && filteredHistory.length > 0 && (
-                      <ul className="absolute z-20 left-0 right-0 mt-2 bg-[#0a0a0c]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-auto max-h-[280px] scrollbar-dark">
+                      <ul className="absolute z-20 inset-x-0 mt-2 bg-surface-raised border border-line-strong
+                                     rounded-xl shadow-lift overflow-auto max-h-[280px] scrollbar-dark">
                         {filteredHistory.map(h => {
                           const selected = manualId.trim() === h.id
                           return (
@@ -498,20 +494,20 @@ export default function Verify({ onComplete }: VerifyProps) {
                                 setManualId(h.id)
                                 setHistoryOpen(false)
                               }}
-                              className={`px-4 py-3 cursor-pointer flex items-center gap-3 border-b border-white/5 last:border-b-0 transition-colors
-                                ${selected ? 'bg-rose-500/10' : 'hover:bg-white/[0.04]'}`}>
+                              className={`px-4 py-3 cursor-pointer flex items-center gap-3 border-b border-line
+                                          last:border-b-0 transition-colors
+                                ${selected ? 'bg-accent-soft' : 'hover:bg-white/[0.04]'}`}>
                               <Icon icon={h.kind === 'video' ? 'lucide:video' : 'lucide:image'}
-                                    width="16"
-                                    className="text-cyan-400 shrink-0" />
+                                    width="15" className="text-ink-lo shrink-0" />
                               <div className="min-w-0 flex-1">
-                                <div className="text-[13px] text-white truncate font-medium">
-                                  {h.media || <span className="text-slate-500">— no media id —</span>}
+                                <div className="text-sm text-ink-hi truncate">
+                                  {h.media || <span className="text-ink-faint">— no media id —</span>}
                                 </div>
-                                <div className="text-[11px] text-slate-500 font-mono truncate">
+                                <div className="meta truncate">
                                   {h.id}{h.created_at ? ` · ${new Date(h.created_at).toLocaleDateString()}` : ''}
                                 </div>
                               </div>
-                              {selected && <Icon icon="lucide:check" width="14" className="text-rose-400 shrink-0" />}
+                              {selected && <Icon icon="lucide:check" width="14" className="text-accent shrink-0" />}
                             </li>
                           )
                         })}
@@ -519,13 +515,13 @@ export default function Verify({ onComplete }: VerifyProps) {
                     )}
 
                     {token && history.length === 0 && (
-                      <p className="mt-2 text-[11.5px] text-slate-500">
+                      <p className="mt-2 text-xs text-ink-lo">
                         Your encode history is empty — paste an encode ID directly.
                       </p>
                     )}
 
                     {!token && (
-                      <p className="mt-2 text-[11.5px] text-slate-500">
+                      <p className="mt-2 text-xs text-ink-lo">
                         Sign in to browse your encode history, or paste an ID directly.
                       </p>
                     )}
@@ -533,7 +529,7 @@ export default function Verify({ onComplete }: VerifyProps) {
                 )}
 
                 {metaSource === 'file' && (
-                  <div>
+                  <>
                     <input
                       ref={metaInputRef}
                       type="file"
@@ -544,35 +540,39 @@ export default function Verify({ onComplete }: VerifyProps) {
                     <button
                       type="button"
                       onClick={() => metaInputRef.current?.click()}
-                      className="w-full text-left px-4 py-3 rounded-xl border border-dashed border-white/15 hover:border-rose-500/40 hover:bg-white/[0.02] transition-all text-[13.5px] flex items-center gap-3 text-slate-300">
-                      <Icon icon="lucide:file-json" width="18" className="text-rose-400" />
-                      {metaFile ? <span className="font-mono">{metaFile.name}</span> : <span className="text-slate-500">Choose metadata.json…</span>}
+                      className="w-full text-left px-4 py-3 rounded-xl border border-dashed border-line-strong
+                                 hover:border-accent-line hover:bg-white/[0.02] transition-colors
+                                 text-base flex items-center gap-3">
+                      <Icon icon="lucide:file-json" width="17" className="text-accent shrink-0" />
+                      {metaFile
+                        ? <span className="font-mono text-ink-hi truncate">{metaFile.name}</span>
+                        : <span className="text-ink-faint">Choose metadata.json…</span>}
                     </button>
+                  </>
+                )}
+              </div>
+
+              <div className="p-6 flex flex-col gap-4">
+                <div className="callout-warn">
+                  <Icon icon="lucide:alert-triangle" className="text-warn shrink-0 mt-0.5" width="16" />
+                  <p>
+                    Make sure this file was previously watermarked using our{' '}
+                    <strong className="text-ink-hi font-medium">Encode</strong> suite. Verifying an
+                    unprotected, standard file will always return a{' '}
+                    <strong className="text-alert font-medium">tampered</strong> result.
+                  </p>
+                </div>
+
+                {errorMsg && (
+                  <div className="callout-alert">
+                    <Icon icon="lucide:alert-circle" width="15" className="text-alert shrink-0 mt-0.5" />
+                    {errorMsg}
                   </div>
                 )}
 
-              </div>
-
-              {/* Warning */}
-              <div className="mx-6 mt-6 px-5 py-4 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-start gap-3">
-                <Icon icon="lucide:alert-triangle" className="text-amber-400 shrink-0 mt-0.5" width="18" />
-                <p className="text-[13px] text-slate-300 leading-relaxed">
-                  Make sure this file was previously watermarked using our <strong className="text-white font-semibold">Encode</strong> suite.
-                  Verifying an unprotected, standard file will always return a <strong className="text-rose-400 font-semibold">Tampered</strong> result.
-                </p>
-              </div>
-
-              {errorMsg && (
-                <div className="mx-6 mt-4 px-5 py-3 bg-rose-500/5 border border-rose-500/20 rounded-xl text-[12.5px] text-rose-300 flex items-start gap-2">
-                  <Icon icon="lucide:alert-circle" width="14" className="mt-0.5 shrink-0" /> {errorMsg}
-                </div>
-              )}
-
-              <div className="p-6">
-                <button onClick={startVerify}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-rose-500 text-white font-bold rounded-xl hover:bg-rose-400 hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] transition-all text-[15px]">
-                  <Icon icon="lucide:scan" width="18" />
-                  Run Integrity Verification
+                <button onClick={startVerify} className="btn-primary btn-lg btn-block">
+                  <Icon icon="lucide:scan" width="17" />
+                  Run integrity verification
                 </button>
               </div>
             </div>
@@ -584,88 +584,84 @@ export default function Verify({ onComplete }: VerifyProps) {
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragLeave={() => setStage('idle')}
-              className={`border-[1.5px] border-dashed rounded-3xl p-20 text-center cursor-pointer transition-all duration-300 relative overflow-hidden group
+              className={`rounded-2xl border border-dashed p-16 text-center cursor-pointer group
+                          transition-colors duration-200
                 ${stage === 'dragging'
-                  ? 'border-rose-400 bg-rose-500/5 shadow-[0_0_30px_rgba(244,63,94,0.1)] scale-[1.01]'
-                  : 'border-white/20 bg-[#111318] hover:border-rose-500/50 hover:bg-white/[0.02]'}`}>
-
-              <div className={`absolute inset-0 bg-gradient-to-b from-rose-500/5 to-transparent opacity-0 transition-opacity duration-300 ${stage === 'dragging' ? 'opacity-100' : 'group-hover:opacity-100'}`} />
+                  ? 'border-accent bg-accent-soft'
+                  : 'border-line-strong bg-surface hover:border-accent-line hover:bg-surface-raised'}`}>
 
               <input ref={inputRef} type="file" accept="image/*,video/*" className="hidden"
                 onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }} />
 
-              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-all duration-300 relative z-10
-                ${stage === 'dragging' ? 'bg-rose-500/20 text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.3)]' : 'bg-white/5 text-slate-400 group-hover:bg-rose-500/10 group-hover:text-rose-400'}`}>
-                <Icon icon="lucide:file-search" width="36" height="36" strokeWidth="1.5" />
-              </div>
+              <span className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6
+                                transition-colors duration-200
+                ${stage === 'dragging'
+                  ? 'bg-accent-soft text-accent'
+                  : 'bg-white/[0.04] text-ink-lo group-hover:text-accent'}`}>
+                <Icon icon="lucide:file-search" width="30" strokeWidth="1.5" />
+              </span>
 
-              <h3 className="font-display text-[1.6rem] text-white font-normal mb-2 relative z-10">Select or drop file</h3>
-              <p className="text-slate-400 text-[14px] mb-6 relative z-10">Upload a watermarked file to run analysis</p>
+              <h2 className="font-display text-2xl text-ink-hi mb-2">Select or drop file</h2>
+              <p className="text-base text-ink-lo mb-6">Upload a watermarked file to run analysis</p>
 
-              <div className="flex gap-2 justify-center flex-wrap mb-4 relative z-10">
+              <div className="flex gap-1.5 justify-center flex-wrap mb-4">
                 {['JPG','PNG','MP4','AVI','MOV'].map(t => (
-                  <span key={t} className="px-3 py-1 bg-white/5 border border-white/10 text-slate-300 text-[10px] font-bold tracking-widest rounded-md uppercase">{t}</span>
+                  <span key={t} className="badge-neutral">{t}</span>
                 ))}
               </div>
-              <p className="text-[12px] text-slate-500 font-mono relative z-10">Max file size: 100 MB</p>
+              <p className="meta">Max file size 100 MB</p>
             </div>
           )}
         </div>
 
-        {/* Sidebar */}
-        <aside className="flex flex-col gap-5 w-full">
+        {/* ── Sidebar ── */}
+        <aside className="flex flex-col gap-4">
 
-          <div className="bg-[#111318] border border-white/5 rounded-3xl p-6 shadow-lg">
-            <h4 className="font-medium text-[14px] mb-5 text-white flex items-center gap-2">
-              <Icon icon="lucide:target" className="text-rose-400" width="18" />
+          <section className="card p-5">
+            <h3 className="text-base font-medium text-ink-hi flex items-center gap-2 mb-4">
+              <Icon icon="lucide:target" className="text-alert" width="16" />
               What we detect
-            </h4>
-            <ul className="flex flex-col gap-4">
-              {DETECT_ITEMS.map((item, i) => (
-                <li key={i} className="flex items-center gap-3 text-[13px] text-slate-400 leading-relaxed">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0 shadow-[0_0_8px_#f43f5e]" />
+            </h3>
+            <ul className="flex flex-col gap-3">
+              {DETECT_ITEMS.map(item => (
+                <li key={item} className="flex items-center gap-2.5 text-sm text-ink-lo">
+                  <span className="w-1 h-1 rounded-full bg-alert shrink-0" />
                   {item}
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
 
-          <div className="bg-[#111318] border border-white/5 rounded-3xl p-6 shadow-lg">
-            <h4 className="font-medium text-[14px] mb-5 text-white flex items-center gap-2">
-              <Icon icon="lucide:file-text" className="text-cyan-400" width="18" />
+          <section className="card p-5">
+            <h3 className="text-base font-medium text-ink-hi flex items-center gap-2 mb-4">
+              <Icon icon="lucide:file-text" className="text-accent" width="16" />
               What you get back
-            </h4>
-            <ul className="flex flex-col gap-4">
-              {[
-                { icon: 'lucide:badge-check', text: 'Authentic / Tampered verdict with confidence score' },
-                { icon: 'lucide:map-pin', text: 'Exact spatial pixel regions that were altered' },
-                { icon: 'lucide:film', text: 'Per-frame timeline analysis for video files' },
-                { icon: 'lucide:activity', text: 'Visual sub-block parity mismatch heatmap' },
-                { icon: 'lucide:download-cloud', text: 'Downloadable structured JSON report' },
-              ].map((item, i) => (
-                <li key={i} className="flex items-start gap-3 text-[13px] text-slate-400 leading-relaxed">
-                  <Icon icon={item.icon} className="text-slate-500 shrink-0 mt-0.5" width="16" />
+            </h3>
+            <ul className="flex flex-col gap-3.5">
+              {REPORT_ITEMS.map(item => (
+                <li key={item.text} className="flex items-start gap-3 text-sm text-ink-lo leading-relaxed">
+                  <Icon icon={item.icon} className="text-ink-faint shrink-0 mt-0.5" width="15" />
                   {item.text}
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
 
-          <div className="bg-gradient-to-br from-emerald-500/5 to-[#111318] border border-emerald-500/20 rounded-3xl p-6">
-            <h4 className="font-medium text-[14px] mb-3 text-emerald-400 flex items-center gap-2">
-              <Icon icon="lucide:lock" width="16" />
-              Privacy Notice
-            </h4>
-            <p className="text-[12.5px] text-slate-300 leading-relaxed">
-              Files you upload here are used only to produce this report, and are deleted from the
-              server as soon as it has been generated — including if the analysis fails.
+          <section className="card p-5">
+            <h3 className="text-base font-medium text-ok flex items-center gap-2 mb-3">
+              <Icon icon="lucide:lock" width="15" />
+              Privacy notice
+            </h3>
+            <p className="text-sm text-ink-lo leading-relaxed">
+              Files you upload here are used only to produce this report, and are deleted from
+              the server as soon as it has been generated — including if the analysis fails.
             </p>
-            <p className="text-[12.5px] text-slate-400 leading-relaxed mt-3">
-              Watermarked files you create in <strong className="text-white font-medium">Encode</strong> are
-              kept, so you can re-download them from your Dashboard.
+            <p className="text-sm text-ink-lo leading-relaxed mt-3">
+              Watermarked files you create in{' '}
+              <strong className="text-ink-hi font-medium">Encode</strong> are kept, so you can
+              re-download them from your Dashboard.
             </p>
-          </div>
-
+          </section>
         </aside>
       </div>
     </div>

@@ -21,6 +21,21 @@ const ENCODE_STEPS = [
   'Finalizing watermarked output...',
 ]
 
+const SIDEBAR_FACTS = [
+  { icon: 'lucide:eye-off',        text: 'Watermark is mathematically invisible to the human eye.' },
+  { icon: 'lucide:file-archive',   text: 'Survives normal compression, resizing, and web sharing.' },
+  { icon: 'lucide:alert-triangle', text: 'Fractures when pixels are maliciously altered or deepfaked.' },
+  { icon: 'lucide:bar-chart-2',    text: 'Maintains PSNR visual quality securely above 28 dB.' },
+]
+
+const USE_CASES = [
+  'Insurance claim photos',
+  'Medical imaging',
+  'Police bodycam footage',
+  'Official documents',
+  'News photography',
+]
+
 interface EncodeResponse {
   id: string
   kind: 'image' | 'video'
@@ -163,7 +178,7 @@ export default function Encode({ navigate }: EncodeProps) {
   // the watermark to a real account instead of a free-text owner string.
   if (authLoading) {
     return (
-      <div className="max-w-md mx-auto px-7 pt-24 pb-32 text-center text-slate-500 flex items-center justify-center gap-3">
+      <div className="page-narrow pt-24 pb-32 flex items-center justify-center gap-3 text-base text-ink-lo">
         <Icon icon="lucide:loader-2" width="18" className="animate-spin" /> Loading...
       </div>
     )
@@ -171,23 +186,21 @@ export default function Encode({ navigate }: EncodeProps) {
 
   if (!user) {
     return (
-      <div className="max-w-md mx-auto px-7 pt-24 pb-32 text-center relative z-10">
-        <div className="absolute top-[10%] left-[20%] w-[60%] h-[40%] bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
-        <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto mb-6">
-          <Icon icon="lucide:lock" width="28" />
-        </div>
-        <h1 className="font-display text-[1.8rem] text-white font-medium mb-3">Sign in to encode</h1>
-        <p className="text-slate-400 text-[14.5px] mb-8 leading-relaxed">
+      <div className="page-narrow pt-24 pb-32 text-center">
+        <span className="w-14 h-14 rounded-2xl bg-accent-soft border border-accent-line text-accent
+                         flex items-center justify-center mx-auto mb-6">
+          <Icon icon="lucide:lock" width="24" />
+        </span>
+        <h1 className="font-display text-2xl text-ink-hi mb-3">Sign in to encode</h1>
+        <p className="text-base text-ink-lo leading-relaxed mb-8">
           Encoding ties each watermark to your account so ownership can be verified later.
         </p>
         <div className="flex gap-3 justify-center">
-          <button onClick={() => navigate('login')}
-            className="px-6 py-3 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 transition-all text-[14px] flex items-center gap-2">
-            <Icon icon="lucide:log-in" width="16" /> Sign In
+          <button onClick={() => navigate('login')} className="btn-primary">
+            <Icon icon="lucide:log-in" width="16" /> Sign in
           </button>
-          <button onClick={() => navigate('register')}
-            className="px-6 py-3 bg-white/5 border border-white/10 text-white font-medium rounded-xl hover:bg-white/10 transition-all text-[14px] flex items-center gap-2">
-            <Icon icon="lucide:user-plus" width="16" /> Create Account
+          <button onClick={() => navigate('register')} className="btn-ghost">
+            <Icon icon="lucide:user-plus" width="16" /> Create account
           </button>
         </div>
       </div>
@@ -195,250 +208,233 @@ export default function Encode({ navigate }: EncodeProps) {
   }
 
   return (
-    <div className="max-w-[1100px] mx-auto px-7 pb-20 relative z-10">
+    <div className="page pb-8">
 
-      {/* Background Ambient Glow */}
-      <div className="absolute top-[10%] left-[20%] w-[40%] h-[30%] bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none -z-10" />
-
-      {/* Header */}
-      <div className="text-center pt-16 pb-12">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[12px] font-semibold rounded-full mb-5 backdrop-blur-md">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/></svg>
-          Step 1 — Watermark Embedding
-        </div>
-        <h1 className="font-display text-[clamp(2.2rem,5vw,3.4rem)] text-white font-normal mb-4 leading-tight tracking-tight">Encode Watermark</h1>
-        <p className="text-slate-400 text-[1.05rem] max-w-lg mx-auto leading-relaxed">
-          Upload your original image or video. We'll embed an invisible semi-fragile watermark
-          so any future tampering can be detected and localized.
+      {/* ── Header ── */}
+      <header className="pt-16 pb-12 max-w-2xl">
+        <span className="pill-accent mb-5">
+          <Icon icon="lucide:layers" width="13" />
+          Step 1 — watermark embedding
+        </span>
+        <h1 className="page-title mb-4">Encode watermark</h1>
+        <p className="page-lead">
+          Upload your original image or video. We'll embed an invisible semi-fragile
+          watermark so any future tampering can be detected and localized.
         </p>
-      </div>
+      </header>
 
-      {/* How it works strip */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+      {/* ── Progress rail ── */}
+      <ol className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5 pb-12 mb-12 border-b border-line">
         {[
           { n: '01', title: 'Upload original', desc: 'Your clean, unmodified media' },
           { n: '02', title: 'Embed watermark', desc: 'LWT + DCT + SVD with QIM payload' },
           { n: '03', title: 'Download secure', desc: 'Use or share the protected file' },
-        ].map((s, i) => (
-          <div key={i} className="bg-[#111318]/80 backdrop-blur-sm border border-white/5 rounded-2xl px-5 py-4 flex items-center gap-4">
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center text-[12px] font-bold shrink-0 shadow-[0_0_10px_rgba(34,211,238,0.1)]">{s.n}</div>
+        ].map(s => (
+          <li key={s.n} className="flex items-start gap-3.5">
+            <span className="font-mono text-2xs text-accent pt-0.5">{s.n}</span>
             <div>
-              <div className="font-medium text-white text-[13.5px] mb-0.5">{s.title}</div>
-              <div className="text-[12px] text-slate-400">{s.desc}</div>
+              <div className="text-base font-medium text-ink-hi">{s.title}</div>
+              <div className="text-sm text-ink-lo">{s.desc}</div>
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_296px] gap-6 items-start">
 
-        {/* Main area */}
-        <div className="w-full">
+        {/* ── Main area ── */}
+        <div className="min-w-0">
 
-          {/* ── DONE: show result ── */}
+          {/* ── DONE ── */}
           {stage === 'done' && wmPreview && file ? (
-            <div className="bg-[#111318] border border-emerald-500/30 rounded-3xl overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.05)]">
+            <div className="card overflow-hidden animate-fade-up">
 
-              {/* Success banner */}
-              <div className="flex items-center gap-4 px-6 py-4 bg-emerald-500/10 border-b border-emerald-500/20">
-                <div className="w-9 h-9 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center shrink-0 border border-emerald-500/30">
-                  <Icon icon="lucide:check" width="20" height="20" strokeWidth="3" />
-                </div>
-                <div>
-                  <p className="font-semibold text-[14px] text-emerald-400">Watermark embedded successfully</p>
-                  <p className="text-[12.5px] text-emerald-400/70">
-                    PSNR: {psnr.toFixed(1)} dB · ID: {encodedId}
-                    {ownerTag && <> · Owner tag: <span className="font-mono">{ownerTag}</span></>}
+              <div className="card-strip border-b flex items-center gap-3.5 px-6 py-4">
+                <span className="w-9 h-9 rounded-lg bg-ok-soft border border-ok-line text-ok
+                                 flex items-center justify-center shrink-0">
+                  <Icon icon="lucide:check" width="18" strokeWidth="2.5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-base font-medium text-ink-hi">Watermark embedded</p>
+                  <p className="text-xs text-ink-lo font-mono truncate">
+                    psnr {psnr.toFixed(1)} dB · id {encodedId}
+                    {ownerTag && <> · owner {ownerTag}</>}
                   </p>
                 </div>
               </div>
 
               {/* Side-by-side preview */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-white/10">
-                <div className="bg-[#0a0a0c] flex flex-col">
-                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-5 py-3 border-b border-white/5 bg-[#111318]">Original</p>
-                  <div className="p-4 flex-1 flex items-center justify-center">
+              <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-line">
+                <figure className="flex flex-col">
+                  <figcaption className="label px-5 py-3 border-b border-line">Original</figcaption>
+                  <div className="bg-surface-inset p-4 flex-1 flex items-center justify-center">
                     {file.type.startsWith('video/')
-                      ? <video src={preview!} controls className="max-w-full max-h-[300px] object-contain rounded-lg shadow-2xl" />
-                      : <img src={preview!} alt="original" className="max-w-full max-h-[300px] object-contain rounded-lg shadow-2xl" />}
+                      ? <video src={preview!} controls className="max-w-full max-h-[280px] object-contain rounded-lg" />
+                      : <img src={preview!} alt="original" className="max-w-full max-h-[280px] object-contain rounded-lg" />}
                   </div>
-                </div>
-                <div className="bg-[#0a0a0c] flex flex-col">
-                  <p className="text-[11px] font-bold text-cyan-400 uppercase tracking-widest px-5 py-3 border-b border-white/5 bg-[#111318] flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#22d3ee]" />
+                </figure>
+                <figure className="flex flex-col">
+                  <figcaption className="label px-5 py-3 border-b border-line flex items-center gap-2 text-accent">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent" />
                     Protected
-                  </p>
-                  <div className="p-4 flex-1 flex items-center justify-center">
+                  </figcaption>
+                  <div className="bg-surface-inset p-4 flex-1 flex items-center justify-center">
                     {encodedKind === 'video'
-                      ? <video src={wmPreview} controls className="max-w-full max-h-[300px] object-contain rounded-lg shadow-2xl" />
-                      : <img src={wmPreview} alt="watermarked" className="max-w-full max-h-[300px] object-contain rounded-lg shadow-2xl" />}
+                      ? <video src={wmPreview} controls className="max-w-full max-h-[280px] object-contain rounded-lg" />
+                      : <img src={wmPreview} alt="watermarked" className="max-w-full max-h-[280px] object-contain rounded-lg" />}
                   </div>
-                </div>
+                </figure>
               </div>
 
               {/* Metadata row */}
-              <div className="grid grid-cols-3 divide-x divide-white/5 border-t border-white/5 bg-[#111318]">
+              <dl className="grid grid-cols-3 divide-x divide-line border-y border-line card-strip">
                 {[
-                  { label: 'PSNR', value: `${psnr.toFixed(1)} dB` },
+                  { label: 'PSNR',      value: `${psnr.toFixed(1)} dB` },
                   { label: 'Watermark', value: 'Embedded' },
-                  { label: 'File', value: file.name.length > 15 ? file.name.slice(0, 12) + '…' : file.name },
-                ].map((m, i) => (
-                  <div key={i} className="px-5 py-4 text-center">
-                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">{m.label}</div>
-                    <div className="font-medium text-[14px] text-white">{m.value}</div>
+                  { label: 'File',      value: file.name.length > 16 ? file.name.slice(0, 13) + '…' : file.name },
+                ].map(m => (
+                  <div key={m.label} className="px-5 py-4">
+                    <dt className="label mb-1.5">{m.label}</dt>
+                    <dd className="text-base font-medium text-ink-hi truncate">{m.value}</dd>
                   </div>
                 ))}
-              </div>
+              </dl>
 
-              {/* Action buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 p-6 border-t border-white/5 bg-[#111318]">
-                <button onClick={handleDownload}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all text-[14.5px]">
-                  <Icon icon="lucide:download" width="18" height="18" />
-                  Download Protected File
+              <div className="p-6 flex flex-col sm:flex-row gap-3">
+                <button onClick={handleDownload} className="btn-primary btn-lg flex-1">
+                  <Icon icon="lucide:download" width="17" />
+                  Download protected file
                 </button>
-                <button onClick={handleDownloadMeta}
-                  className="flex items-center justify-center gap-2 px-6 py-4 border border-cyan-500/30 text-cyan-400 font-medium rounded-xl hover:bg-cyan-500/10 transition-all text-[14.5px]">
-                  <Icon icon="lucide:file-json" width="18" height="18" />
+                <button onClick={handleDownloadMeta} className="btn-outline btn-lg">
+                  <Icon icon="lucide:file-json" width="17" />
                   metadata.json
                 </button>
-                <button onClick={reset}
-                  className="px-6 py-4 border border-white/10 text-white font-medium rounded-xl hover:bg-white/5 transition-all text-[14.5px]">
-                  Encode Another
+                <button onClick={reset} className="btn-ghost btn-lg">
+                  Encode another
                 </button>
               </div>
 
-              {/* Reminder */}
-              <div className="mx-6 mb-6 px-5 py-4 bg-cyan-500/5 border border-cyan-500/20 rounded-xl flex items-start gap-3">
-                <Icon icon="lucide:info" className="text-cyan-400 shrink-0 mt-0.5" width="18" height="18" />
-                <p className="text-[13px] text-slate-300 leading-relaxed">
-                  <strong className="text-white font-semibold">Keep the original safe.</strong> Share or distribute this protected version.
-                  If it gets tampered with, upload it to the <button type="button" className="text-cyan-400 font-semibold cursor-pointer hover:underline" onClick={() => navigate('verify')}>Verify</button> page to detect and localize modifications.
-                </p>
+              <div className="px-6 pb-6">
+                <div className="callout-accent">
+                  <Icon icon="lucide:info" className="text-accent shrink-0 mt-0.5" width="16" />
+                  <p>
+                    <strong className="text-ink-hi font-medium">Keep the original safe.</strong>{' '}
+                    Share or distribute this protected version. If it gets tampered with, upload it to the{' '}
+                    <button type="button" onClick={() => navigate('verify')}
+                            className="text-accent font-medium hover:underline">Verify</button>{' '}
+                    page to detect and localize modifications.
+                  </p>
+                </div>
               </div>
-
             </div>
 
           ) : stage === 'encoding' ? (
-            /* ── ENCODING progress ── */
-            <div className="bg-[#111318] border border-white/5 rounded-3xl p-12 flex flex-col items-center gap-6 text-center relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-[80px] -mr-20 -mt-20 pointer-events-none" />
-
-              <div className="relative w-16 h-16 flex items-center justify-center mb-2">
-                <div className="absolute inset-0 border-[3px] border-white/5 border-t-cyan-400 rounded-full animate-spin" />
-                <div className="absolute inset-2 border-[3px] border-white/5 border-b-emerald-400 rounded-full animate-spin-slow opacity-70" />
+            /* ── ENCODING ── */
+            <div className="card p-12 flex flex-col items-center gap-6 text-center">
+              <div className="relative w-14 h-14 flex items-center justify-center">
+                <span className="absolute inset-0 rounded-full border-2 border-line border-t-accent animate-spin" />
+                <span className="absolute inset-2.5 rounded-full border-2 border-line border-b-accent/50 animate-spin-slow" />
               </div>
 
               <div>
-                <h3 className="font-display text-[1.8rem] text-white font-normal mb-1">Embedding Watermark</h3>
-                <p className="text-cyan-400 text-[14px] font-medium min-h-[20px]">{ENCODE_STEPS[stepIdx]}</p>
+                <h2 className="font-display text-2xl text-ink-hi mb-1.5">Embedding watermark</h2>
+                <p className="text-base text-accent font-mono min-h-[24px]">{ENCODE_STEPS[stepIdx]}</p>
               </div>
 
               {/* Indeterminate progress: real backend timing isn't streamed,
                   so we show an honest moving stripe + elapsed seconds rather
                   than a fake percentage that lies about progress. */}
-              <div className="w-full max-w-sm mt-2">
-                <div className="flex justify-between text-[12px] font-bold text-slate-400 mb-2">
-                  <span>Working...</span>
-                  <span className="text-white font-mono">
+              <div className="w-full max-w-sm">
+                <div className="flex justify-between text-2xs mb-2">
+                  <span className="label">Working</span>
+                  <span className="font-mono text-ink-hi">
                     {String(Math.floor(progress / 60)).padStart(2, '0')}:{String(progress % 60).padStart(2, '0')}
                   </span>
                 </div>
-                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
-                  <div className="h-full w-2/5 bg-gradient-to-r from-cyan-500 via-emerald-400 to-cyan-500 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.5)] animate-indeterminate" />
+                <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                  <div className="h-full w-2/5 bg-accent rounded-full animate-indeterminate" />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 w-full max-w-sm mt-6 text-left border-t border-white/5 pt-6">
-                {ENCODE_STEPS.map((s, i) => {
-                  const isCurrent = i === stepIdx
-                  return (
-                    <div key={i} className={`flex items-center gap-3 text-[13px] transition-colors duration-300
-                      ${isCurrent ? 'text-white font-medium' : 'text-slate-600'}`}>
-                      <span className="w-5 shrink-0 flex justify-center">
-                        {isCurrent
-                          ? <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse" />
-                          : <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
-                      </span>
-                      {s}
-                    </div>
-                  )
-                })}
-              </div>
+              <ol className="flex flex-col gap-2.5 w-full max-w-sm mt-4 pt-6 border-t border-line text-left">
+                {ENCODE_STEPS.map((s, i) => (
+                  <li key={s} className={`flex items-center gap-3 text-sm transition-colors duration-300
+                    ${i === stepIdx ? 'text-ink-hi' : 'text-ink-faint'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 transition-colors duration-300
+                      ${i === stepIdx ? 'bg-accent' : 'bg-white/15'}`} />
+                    {s}
+                  </li>
+                ))}
+              </ol>
             </div>
 
           ) : stage === 'error' ? (
             /* ── ERROR ── */
-            <div className="bg-[#111318] border border-rose-500/30 rounded-3xl p-10 flex flex-col items-center text-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center">
-                <Icon icon="lucide:alert-octagon" width="24" />
-              </div>
+            <div className="card border-alert-line p-10 flex flex-col items-center text-center gap-4">
+              <span className="w-12 h-12 rounded-xl bg-alert-soft border border-alert-line text-alert
+                               flex items-center justify-center">
+                <Icon icon="lucide:alert-octagon" width="22" />
+              </span>
               <div>
-                <h3 className="font-display text-[1.4rem] text-white mb-1">Encoding failed</h3>
-                <p className="text-[13px] text-rose-300/80 max-w-md break-words">{errorMsg || 'Unknown error'}</p>
+                <h2 className="font-display text-xl text-ink-hi mb-1.5">Encoding failed</h2>
+                <p className="text-sm text-ink-lo max-w-md break-words font-mono">{errorMsg || 'Unknown error'}</p>
               </div>
-              <button onClick={reset} className="px-6 py-3 border border-white/10 text-white font-medium rounded-xl hover:bg-white/5 transition-all text-[14px]">
-                Try Again
-              </button>
+              <button onClick={reset} className="btn-ghost">Try again</button>
             </div>
 
           ) : stage === 'preview' && file ? (
-            /* ── PREVIEW before encoding ── */
-            <div className="bg-[#111318] border border-white/10 rounded-3xl overflow-hidden shadow-xl">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 gap-3 bg-white/[0.02]">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Icon icon="lucide:file-image" className="text-slate-400" width="18" />
-                  <span className="font-medium text-[14px] text-white">{file.name}</span>
-                  <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-slate-300 text-[10px] uppercase tracking-widest font-bold rounded-md">
-                    {file.type.startsWith('video/') ? 'Video' : 'Image'}
-                  </span>
-                  <span className="text-[12px] text-slate-500 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+            /* ── PREVIEW ── */
+            <div className="card overflow-hidden animate-fade-up">
+              <div className="card-strip border-b flex items-center justify-between gap-3 px-5 py-3.5">
+                <div className="flex items-center gap-3 flex-wrap min-w-0">
+                  <Icon icon="lucide:file-image" className="text-ink-lo shrink-0" width="17" />
+                  <span className="text-base font-medium text-ink-hi truncate">{file.name}</span>
+                  <span className="badge-neutral">{file.type.startsWith('video/') ? 'Video' : 'Image'}</span>
+                  <span className="meta">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
-                <button onClick={reset}
-                  className="text-[13px] text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
+                <button onClick={reset} className="btn-quiet btn-sm shrink-0 hover:text-alert">
                   <Icon icon="lucide:x" width="14" /> Remove
                 </button>
               </div>
 
-              <div className="bg-[#0a0a0c] p-6 flex justify-center border-b border-white/5">
+              <div className="bg-surface-inset p-6 flex justify-center border-b border-line">
                 {preview && (
                   file.type.startsWith('video/')
-                    ? <video className="w-full max-h-[400px] object-contain rounded-lg border border-white/10 shadow-2xl" src={preview} controls />
-                    : <img   className="w-full max-h-[400px] object-contain rounded-lg border border-white/10 shadow-2xl" src={preview} alt="preview" />
+                    ? <video className="w-full max-h-[380px] object-contain rounded-lg" src={preview} controls />
+                    : <img   className="w-full max-h-[380px] object-contain rounded-lg" src={preview} alt="preview" />
                 )}
               </div>
 
-              {/* Owner (from auth) + Media ID */}
-              <div className="p-6 border-b border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Owner</label>
-                  <div className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-4 py-3 text-[14px] text-slate-300 flex items-center gap-2">
-                    <Icon icon="lucide:lock" width="14" className="text-cyan-400" />
+              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-line">
+                <div className="field">
+                  <label className="label">Owner</label>
+                  <div className="input-static">
+                    <Icon icon="lucide:lock" width="14" className="text-accent shrink-0" />
                     <span className="font-mono truncate">{user?.email ?? '—'}</span>
                   </div>
                 </div>
-                <div>
-                  <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Media ID</label>
+                <div className="field">
+                  <label className="label" htmlFor="media-id">Media ID</label>
                   <input
+                    id="media-id"
                     type="text"
                     value={mediaId}
                     onChange={e => setMediaId(e.target.value)}
                     placeholder="e.g. project-2026-001"
-                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="input font-mono"
                   />
                 </div>
                 {errorMsg && (
-                  <div className="sm:col-span-2 text-[12.5px] text-rose-400 flex items-center gap-2">
+                  <p className="sm:col-span-2 text-sm text-alert flex items-center gap-2">
                     <Icon icon="lucide:alert-circle" width="14" /> {errorMsg}
-                  </div>
+                  </p>
                 )}
               </div>
 
               <div className="p-6">
-                <button onClick={startEncoding}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all text-[15px]">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/></svg>
-                  Initialize Encoder
+                <button onClick={startEncoding} className="btn-primary btn-lg btn-block">
+                  <Icon icon="lucide:layers" width="17" />
+                  Initialize encoder
                 </button>
               </div>
             </div>
@@ -450,78 +446,77 @@ export default function Encode({ navigate }: EncodeProps) {
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragLeave={() => setStage('idle')}
-              className={`border-[1.5px] border-dashed rounded-3xl p-20 text-center cursor-pointer transition-all duration-300 relative overflow-hidden group
+              className={`rounded-2xl border border-dashed p-16 text-center cursor-pointer group
+                          transition-colors duration-200
                 ${stage === 'dragging'
-                  ? 'border-cyan-400 bg-cyan-500/5 shadow-[0_0_30px_rgba(34,211,238,0.1)] scale-[1.01]'
-                  : 'border-white/20 bg-[#111318] hover:border-cyan-500/50 hover:bg-white/[0.02]'}`}>
-
-              <div className={`absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 transition-opacity duration-300 ${stage === 'dragging' ? 'opacity-100' : 'group-hover:opacity-100'}`} />
+                  ? 'border-accent bg-accent-soft'
+                  : 'border-line-strong bg-surface hover:border-accent-line hover:bg-surface-raised'}`}>
 
               <input ref={inputRef} type="file" accept="image/*,video/*" className="hidden"
                 onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }} />
 
-              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-all duration-300 relative z-10
-                ${stage === 'dragging' ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)]' : 'bg-white/5 text-slate-400 group-hover:bg-cyan-500/10 group-hover:text-cyan-400'}`}>
-                <Icon icon="lucide:upload-cloud" width="36" height="36" strokeWidth="1.5" />
-              </div>
+              <span className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6
+                                transition-colors duration-200
+                ${stage === 'dragging'
+                  ? 'bg-accent-soft text-accent'
+                  : 'bg-white/[0.04] text-ink-lo group-hover:text-accent'}`}>
+                <Icon icon="lucide:upload-cloud" width="30" strokeWidth="1.5" />
+              </span>
 
-              <h3 className="font-display text-[1.6rem] text-white font-normal mb-2 relative z-10">Select or drop media</h3>
-              <p className="text-slate-400 text-[14px] mb-6 relative z-10">Upload a clean file to begin the encoding process</p>
+              <h2 className="font-display text-2xl text-ink-hi mb-2">Select or drop media</h2>
+              <p className="text-base text-ink-lo mb-6">Upload a clean file to begin the encoding process</p>
 
-              <div className="flex gap-2 justify-center flex-wrap mb-4 relative z-10">
+              <div className="flex gap-1.5 justify-center flex-wrap mb-4">
                 {['JPG','PNG','MP4','AVI','MOV'].map(t => (
-                  <span key={t} className="px-3 py-1 bg-white/5 border border-white/10 text-slate-300 text-[10px] font-bold tracking-widest rounded-md uppercase">{t}</span>
+                  <span key={t} className="badge-neutral">{t}</span>
                 ))}
               </div>
-              <p className="text-[12px] text-slate-500 font-mono relative z-10">Max file size: 100 MB</p>
+              <p className="meta">Max file size 100 MB</p>
             </div>
           )}
         </div>
 
-        {/* Sidebar */}
-        <aside className="flex flex-col gap-5 w-full">
+        {/* ── Sidebar ── */}
+        <aside className="flex flex-col gap-4">
 
-          <div className="bg-[#111318] border border-white/5 rounded-3xl p-6 shadow-lg">
-            <h4 className="font-medium text-[14px] mb-5 text-white flex items-center gap-2">
-              <Icon icon="lucide:shield-check" className="text-cyan-400" width="18" />
+          <section className="card p-5">
+            <h3 className="text-base font-medium text-ink-hi flex items-center gap-2 mb-4">
+              <Icon icon="lucide:shield-check" className="text-accent" width="16" />
               What happens next?
-            </h4>
-            <ul className="flex flex-col gap-4">
-              {[
-                { icon: 'lucide:eye-off', text: 'Watermark is mathematically invisible to the human eye.' },
-                { icon: 'lucide:file-archive', text: 'Survives normal compression, resizing, and web sharing.' },
-                { icon: 'lucide:alert-triangle', text: 'Fractures when pixels are maliciously altered or deepfaked.' },
-                { icon: 'lucide:bar-chart-2', text: 'Maintains PSNR visual quality securely above 28 dB.' },
-              ].map((item, i) => (
-                <li key={i} className="flex items-start gap-3 text-[13px] text-slate-400 leading-relaxed">
-                  <Icon icon={item.icon} className="text-slate-500 shrink-0 mt-0.5" width="16" />
+            </h3>
+            <ul className="flex flex-col gap-3.5">
+              {SIDEBAR_FACTS.map(item => (
+                <li key={item.text} className="flex items-start gap-3 text-sm text-ink-lo leading-relaxed">
+                  <Icon icon={item.icon} className="text-ink-faint shrink-0 mt-0.5" width="15" />
                   {item.text}
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
 
-          <div className="bg-gradient-to-br from-cyan-500/10 to-[#111318] border border-cyan-500/20 rounded-3xl p-6 shadow-[0_0_15px_rgba(34,211,238,0.05)]">
-            <h4 className="font-medium text-[14px] mb-2 text-cyan-400">Post-Processing</h4>
-            <p className="text-[13px] text-slate-300 leading-relaxed mb-4">
-              After downloading the watermarked file, distribute it freely. If you suspect it gets manipulated later, upload it to the <strong className="text-white font-semibold">Verify</strong> suite to run spatial analysis.
+          <section className="card border-accent-line bg-accent-soft p-5">
+            <h3 className="text-base font-medium text-accent mb-2">Post-processing</h3>
+            <p className="text-sm text-ink leading-relaxed mb-4">
+              After downloading the watermarked file, distribute it freely. If you suspect it
+              gets manipulated later, upload it to the{' '}
+              <strong className="text-ink-hi font-medium">Verify</strong> suite to run spatial analysis.
             </p>
-            <button onClick={() => navigate('verify')} className="text-[12px] font-bold tracking-widest uppercase text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1">
+            <button onClick={() => navigate('verify')}
+                    className="text-sm font-semibold text-accent hover:text-accent-hover flex items-center gap-1.5 transition-colors">
               Go to Verify <Icon icon="lucide:arrow-right" width="14" />
             </button>
-          </div>
+          </section>
 
-          <div className="bg-[#111318] border border-white/5 rounded-3xl p-6 shadow-lg">
-            <h4 className="font-medium text-[14px] mb-4 text-white">Common Use Cases</h4>
-            <div className="flex flex-col gap-3">
-              {['Insurance claim photos', 'Medical imaging', 'Police bodycam footage', 'Official documents', 'News photography'].map((u, i) => (
-                <div key={i} className="flex items-center gap-3 text-[13px] text-slate-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/50 shrink-0" />{u}
-                </div>
+          <section className="card p-5">
+            <h3 className="text-base font-medium text-ink-hi mb-4">Common use cases</h3>
+            <ul className="flex flex-col gap-2.5">
+              {USE_CASES.map(u => (
+                <li key={u} className="flex items-center gap-2.5 text-sm text-ink-lo">
+                  <span className="w-1 h-1 rounded-full bg-ink-faint shrink-0" />{u}
+                </li>
               ))}
-            </div>
-          </div>
-
+            </ul>
+          </section>
         </aside>
       </div>
     </div>

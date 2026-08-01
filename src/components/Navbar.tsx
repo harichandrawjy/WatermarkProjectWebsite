@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Icon } from '@iconify/react'
 import type { Page } from '../App'
 import { useAuth } from '../context/auth'
@@ -20,9 +20,10 @@ export default function Navbar({ currentPage, navigate }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  const accountRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 12)
+    const fn = () => setScrolled(window.scrollY > 8)
     window.addEventListener('scroll', fn)
     return () => window.removeEventListener('scroll', fn)
   }, [])
@@ -30,185 +31,184 @@ export default function Navbar({ currentPage, navigate }: NavbarProps) {
   // Close the account dropdown whenever the page changes.
   useEffect(() => { setAccountOpen(false) }, [currentPage])
 
+  // ...and on an outside click or Escape, which the previous version left open
+  // until you happened to navigate.
+  useEffect(() => {
+    if (!accountOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (!accountRef.current?.contains(e.target as Node)) setAccountOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAccountOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [accountOpen])
+
+  const navBtn = (active: boolean) =>
+    `px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 ${
+      active ? 'text-ink-hi bg-white/[0.06]' : 'text-ink-lo hover:text-ink-hi hover:bg-white/[0.04]'
+    }`
+
   return (
-    <nav className={`fixed top-0 inset-x-0 z-50 h-[72px] transition-all duration-300 border-b
-      ${scrolled
-        ? 'bg-[#0a0a0c]/80 backdrop-blur-xl border-white/10 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]'
+    <nav className={`fixed top-0 inset-x-0 z-50 h-16 border-b transition-colors duration-300
+      ${scrolled || menuOpen
+        ? 'bg-canvas/85 backdrop-blur-xl border-line'
         : 'bg-transparent border-transparent'}`}>
 
-      <div className="max-w-[1100px] mx-auto px-7 h-full flex items-center justify-between gap-4">
+      <div className="page h-full flex items-center justify-between gap-4">
 
         {/* ── Logo ── */}
         <button
           onClick={() => navigate('home')}
-          className="group flex items-center gap-2.5 font-display font-semibold text-[17px] text-white shrink-0 transition-opacity"
+          className="group flex items-center gap-2.5 font-display text-lg text-ink-hi shrink-0"
         >
-          <span className="text-cyan-400 transition-all duration-300 group-hover:drop-shadow-[0_0_12px_rgba(34,211,238,0.6)] group-hover:scale-105">
-            <Icon icon="lucide:shield-check" width="24" height="24" strokeWidth={1.8} />
-          </span>
-          <span className="tracking-wide">Aegis</span>
+          <Icon icon="lucide:shield-check" width="21" strokeWidth={1.9}
+                className="text-accent transition-transform duration-200 group-hover:scale-110" />
+          Aegis
         </button>
 
-        {/* ── Desktop Links ── */}
-        <ul className="hidden md:flex items-center gap-2 list-none">
-          {LINKS.map(({ label, page }) => {
-            const isActive = currentPage === page
-            return (
-              <li key={page}>
-                <button
-                  onClick={() => navigate(page)}
-                  className={`px-4 py-2 rounded-xl text-[12px] font-bold tracking-widest uppercase transition-all duration-200 border
-                    ${isActive
-                      ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20 shadow-[0_0_15px_rgba(34,211,238,0.1)]'
-                      : 'text-slate-400 border-transparent hover:text-white hover:bg-white/5'
-                    }`}
-                >
-                  {label}
-                </button>
-              </li>
-            )
-          })}
+        {/* ── Desktop links ── */}
+        <ul className="hidden md:flex items-center gap-1 list-none absolute left-1/2 -translate-x-1/2">
+          {LINKS.map(({ label, page }) => (
+            <li key={page}>
+              <button onClick={() => navigate(page)} className={navBtn(currentPage === page)}>
+                {label}
+              </button>
+            </li>
+          ))}
         </ul>
 
         {/* ── Auth area (desktop) ── */}
         <div className="hidden md:flex items-center gap-2 shrink-0">
           {user ? (
-            <div className="relative">
+            <div className="relative" ref={accountRef}>
               <button
                 onClick={() => setAccountOpen(o => !o)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-bold tracking-widest uppercase border transition-all
+                aria-expanded={accountOpen}
+                className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-xl border transition-colors duration-150
                   ${accountOpen
-                    ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
-                    : 'text-slate-300 border-white/10 hover:bg-white/5 hover:text-white'}`}
+                    ? 'bg-white/[0.06] border-line-strong text-ink-hi'
+                    : 'border-line text-ink hover:bg-white/[0.04] hover:text-ink-hi'}`}
               >
-                <span className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400 to-emerald-400 text-[#0a0a0c] flex items-center justify-center text-[11px] font-bold">
+                <span className="w-6 h-6 rounded-lg bg-accent text-accent-ink flex items-center justify-center text-xs font-bold">
                   {user.email.charAt(0).toUpperCase()}
                 </span>
-                <span className="font-mono normal-case tracking-normal max-w-[140px] truncate">{user.email}</span>
-                <Icon icon="lucide:chevron-down" width="14" className={`transition-transform ${accountOpen ? 'rotate-180' : ''}`} />
+                <span className="text-sm font-mono max-w-[150px] truncate">{user.email}</span>
+                <Icon icon="lucide:chevron-down" width="14"
+                      className={`text-ink-lo transition-transform duration-200 ${accountOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {accountOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-[#0a0a0c]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+                <div className="absolute right-0 top-full mt-2 w-52 bg-surface-raised border border-line-strong rounded-xl shadow-lift overflow-hidden animate-fade-in">
                   <button
                     onClick={() => navigate('dashboard')}
-                    className="w-full text-left px-4 py-3 text-[13px] text-slate-300 hover:bg-white/5 hover:text-white flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-white/[0.05] hover:text-ink-hi flex items-center gap-3 transition-colors"
                   >
-                    <Icon icon="lucide:layout-dashboard" width="16" className="text-cyan-400" />
+                    <Icon icon="lucide:layout-dashboard" width="15" className="text-ink-lo" />
                     Dashboard
                   </button>
                   <button
                     onClick={() => navigate('encode')}
-                    className="w-full text-left px-4 py-3 text-[13px] text-slate-300 hover:bg-white/5 hover:text-white flex items-center gap-3 transition-colors border-t border-white/5"
+                    className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-white/[0.05] hover:text-ink-hi flex items-center gap-3 transition-colors"
                   >
-                    <Icon icon="lucide:plus" width="16" className="text-cyan-400" />
-                    Encode New
+                    <Icon icon="lucide:plus" width="15" className="text-ink-lo" />
+                    Encode new
                   </button>
                   <button
                     onClick={() => { logout(); navigate('home') }}
-                    className="w-full text-left px-4 py-3 text-[13px] text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 flex items-center gap-3 transition-colors border-t border-white/5"
+                    className="w-full text-left px-4 py-2.5 text-sm text-alert hover:bg-alert-soft flex items-center gap-3 transition-colors border-t border-line"
                   >
-                    <Icon icon="lucide:log-out" width="16" />
-                    Sign Out
+                    <Icon icon="lucide:log-out" width="15" />
+                    Sign out
                   </button>
                 </div>
               )}
             </div>
           ) : (
             <>
-              <button
-                onClick={() => navigate('login')}
-                className={`px-4 py-2 rounded-xl text-[12px] font-bold tracking-widest uppercase transition-all border
-                  ${currentPage === 'login'
-                    ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
-                    : 'text-slate-300 border-transparent hover:text-white hover:bg-white/5'}`}
-              >
-                Sign In
+              <button onClick={() => navigate('login')} className={navBtn(currentPage === 'login')}>
+                Sign in
               </button>
-              <button
-                onClick={() => navigate('register')}
-                className="px-4 py-2 rounded-xl text-[12px] font-bold tracking-widest uppercase bg-cyan-500 text-slate-950 hover:bg-cyan-400 hover:shadow-[0_0_15px_rgba(34,211,238,0.3)] transition-all"
-              >
-                Sign Up
+              <button onClick={() => navigate('register')} className="btn-primary btn-sm">
+                Sign up
               </button>
             </>
           )}
         </div>
 
-        {/* ── Mobile Burger ── */}
+        {/* ── Mobile burger ── */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           className="md:hidden flex flex-col gap-[5px] p-2 rounded-lg hover:bg-white/5 transition-colors"
-          aria-label="Toggle Menu"
+          aria-label="Toggle menu"
+          aria-expanded={menuOpen}
         >
-          <span className={`block w-6 h-[2px] bg-slate-300 rounded-full transition-all duration-300 ${menuOpen ? 'translate-y-[7px] rotate-45 bg-cyan-400' : ''}`} />
-          <span className={`block w-6 h-[2px] bg-slate-300 rounded-full transition-all duration-300 ${menuOpen ? 'opacity-0' : ''}`} />
-          <span className={`block w-6 h-[2px] bg-slate-300 rounded-full transition-all duration-300 ${menuOpen ? '-translate-y-[7px] -rotate-45 bg-cyan-400' : ''}`} />
+          <span className={`block w-5 h-[1.5px] bg-ink rounded-full transition-transform duration-300 ${menuOpen ? 'translate-y-[6.5px] rotate-45' : ''}`} />
+          <span className={`block w-5 h-[1.5px] bg-ink rounded-full transition-opacity duration-200 ${menuOpen ? 'opacity-0' : ''}`} />
+          <span className={`block w-5 h-[1.5px] bg-ink rounded-full transition-transform duration-300 ${menuOpen ? '-translate-y-[6.5px] -rotate-45' : ''}`} />
         </button>
       </div>
 
-      {/* ── Mobile Menu ── */}
-      <div className={`md:hidden absolute top-[72px] left-0 right-0 bg-[#0a0a0c]/95 backdrop-blur-xl border-b border-white/10 transition-all duration-300 overflow-hidden ${menuOpen ? 'max-h-[500px] opacity-100 border-opacity-100' : 'max-h-0 opacity-0 border-opacity-0'}`}>
-        <div className="flex flex-col px-5 py-4 gap-2">
-          {LINKS.map(({ label, page }) => {
-            const isActive = currentPage === page
-            return (
-              <button
-                key={page}
-                onClick={() => { navigate(page); setMenuOpen(false) }}
-                className={`text-left px-4 py-3 rounded-xl text-[14px] font-medium transition-all duration-200 flex items-center gap-3
-                  ${isActive
-                    ? 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20'
-                    : 'text-slate-400 border border-transparent hover:text-white hover:bg-white/5'
-                  }`}
-              >
-                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />}
-                {label}
-              </button>
-            )
-          })}
+      {/* ── Mobile menu ── */}
+      <div className={`md:hidden absolute top-16 inset-x-0 bg-canvas/95 backdrop-blur-xl border-b border-line overflow-hidden transition-[max-height,opacity] duration-300
+        ${menuOpen ? 'max-h-[480px] opacity-100' : 'max-h-0 opacity-0'}`}>
+        <div className="page py-4 flex flex-col gap-1">
+          {LINKS.map(({ label, page }) => (
+            <button
+              key={page}
+              onClick={() => { navigate(page); setMenuOpen(false) }}
+              className={`text-left px-3 py-2.5 rounded-lg text-base font-medium transition-colors
+                ${currentPage === page
+                  ? 'text-ink-hi bg-white/[0.06]'
+                  : 'text-ink-lo hover:text-ink-hi hover:bg-white/[0.04]'}`}
+            >
+              {label}
+            </button>
+          ))}
 
-          <div className="border-t border-white/10 mt-2 pt-3 flex flex-col gap-2">
+          <div className="border-t border-line mt-3 pt-3 flex flex-col gap-1">
             {user ? (
               <>
-                <p className="px-4 text-[11px] uppercase tracking-widest text-slate-500 mb-1">Signed in as</p>
-                <p className="px-4 text-[13px] text-cyan-400 font-mono truncate">{user.email}</p>
+                <p className="label px-3 mb-1">Signed in as</p>
+                <p className="px-3 text-sm text-ink font-mono truncate mb-2">{user.email}</p>
                 <button
                   onClick={() => { navigate('dashboard'); setMenuOpen(false) }}
-                  className={`text-left px-4 py-3 rounded-xl text-[14px] font-medium transition-all flex items-center gap-3
+                  className={`text-left px-3 py-2.5 rounded-lg text-base font-medium transition-colors flex items-center gap-3
                     ${currentPage === 'dashboard'
-                      ? 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20'
-                      : 'text-slate-400 border border-transparent hover:text-white hover:bg-white/5'}`}
+                      ? 'text-ink-hi bg-white/[0.06]'
+                      : 'text-ink-lo hover:text-ink-hi hover:bg-white/[0.04]'}`}
                 >
                   <Icon icon="lucide:layout-dashboard" width="16" /> Dashboard
                 </button>
                 <button
                   onClick={() => { logout(); navigate('home'); setMenuOpen(false) }}
-                  className="text-left px-4 py-3 rounded-xl text-[14px] font-medium text-rose-300 hover:bg-rose-500/10 transition-all flex items-center gap-3 border border-transparent"
+                  className="text-left px-3 py-2.5 rounded-lg text-base font-medium text-alert hover:bg-alert-soft transition-colors flex items-center gap-3"
                 >
-                  <Icon icon="lucide:log-out" width="16" /> Sign Out
+                  <Icon icon="lucide:log-out" width="16" /> Sign out
                 </button>
               </>
             ) : (
               <>
                 <button
                   onClick={() => { navigate('login'); setMenuOpen(false) }}
-                  className="text-left px-4 py-3 rounded-xl text-[14px] font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-all flex items-center gap-3 border border-transparent"
+                  className="text-left px-3 py-2.5 rounded-lg text-base font-medium text-ink-lo hover:text-ink-hi hover:bg-white/[0.04] transition-colors flex items-center gap-3"
                 >
-                  <Icon icon="lucide:log-in" width="16" /> Sign In
+                  <Icon icon="lucide:log-in" width="16" /> Sign in
                 </button>
                 <button
                   onClick={() => { navigate('register'); setMenuOpen(false) }}
-                  className="text-left px-4 py-3 rounded-xl text-[14px] font-bold bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition-all flex items-center gap-3"
+                  className="btn-primary mt-1"
                 >
-                  <Icon icon="lucide:user-plus" width="16" /> Sign Up
+                  <Icon icon="lucide:user-plus" width="16" /> Sign up
                 </button>
               </>
             )}
           </div>
         </div>
       </div>
-
     </nav>
   )
 }
