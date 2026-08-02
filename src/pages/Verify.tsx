@@ -41,7 +41,7 @@ const DETECT_ITEMS = [
 ]
 
 const REPORT_ITEMS = [
-  { icon: 'lucide:badge-check',    text: 'Authentic / tampered verdict with confidence score' },
+  { icon: 'lucide:badge-check',    text: 'Authentic / tampered verdict, with the reason it was flagged' },
   { icon: 'lucide:map-pin',        text: 'Exact spatial pixel regions that were altered' },
   { icon: 'lucide:film',           text: 'Per-frame timeline analysis for video files' },
   { icon: 'lucide:activity',       text: 'Visual sub-block parity mismatch heatmap' },
@@ -247,9 +247,10 @@ export default function Verify({ onComplete }: VerifyProps) {
       const raw = await res.json() as Partial<AnalysisResult>
       const data: AnalysisResult = {
         status: raw.status ?? 'tampered',
-        confidence: raw.confidence ?? 0,
         wmAccuracy: raw.wmAccuracy ?? 0,
         ber: raw.ber ?? 0,
+        blockFlagRatio: raw.blockFlagRatio,
+        reasons: raw.reasons,
         tamperedRegions: raw.tamperedRegions ?? [],
         frameResults: raw.frameResults,
         fileName: raw.fileName ?? file.name,

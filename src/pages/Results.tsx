@@ -110,7 +110,7 @@ export default function Results({ result, navigate }: ResultsProps) {
     </div>
   )
 
-  const { status, confidence, wmAccuracy, ber, tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight,
+  const { status, wmAccuracy, ber, reasons, tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight,
           watermarkFound, ownerMatch, mediaMatch, ownerId, mediaId, ownerLabel, mediaLabel,
           watermarkOriginal, watermarkExtracted,
           missingFrames, reordered, duplicateFrames, framesTruncated } = result
@@ -180,13 +180,40 @@ export default function Results({ result, navigate }: ResultsProps) {
               <p className={`font-display text-3xl leading-none mb-1.5 ${tampered ? 'text-alert' : 'text-ok'}`}>
                 {tampered ? 'Tampered' : 'Authentic'}
               </p>
-              <p className="text-xs text-ink-lo font-mono">
-                {(confidence * 100).toFixed(1)}% confidence
+              {/* The reason it was flagged, not a synthesised confidence
+                  percentage. A tampered file can be pixel-clean (identity
+                  destroyed by re-encoding, or a frame deleted), so a score
+                  derived from cleanliness used to read "100% confidence"
+                  on exactly the cases that most needed explaining. */}
+              <p className="text-xs text-ink-lo">
+                {tampered
+                  ? (reasons?.length ? reasons[0] : 'integrity check failed')
+                  : 'all integrity checks passed'}
               </p>
             </div>
           </div>
         </div>
       </header>
+
+      {/* ── Why it was flagged ──
+          A tampered verdict is a single boolean OR'd from unrelated signals,
+          so the verdict alone can't say whether the file was edited, re-encoded
+          past recovery, or had frames removed. Listing the triggers is both
+          truthful and more actionable than a percentage. */}
+      {tampered && (reasons?.length ?? 0) > 0 && (
+        <div className="card p-5 mb-6 border-alert-line bg-alert-soft">
+          <p className="label mb-3 text-alert">Why this was flagged</p>
+          <ul className="flex flex-col gap-2">
+            {reasons!.map((r, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-ink">
+                <Icon icon="lucide:alert-triangle" width="15"
+                      className="text-alert shrink-0 mt-0.5" />
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* ── Metrics ── */}
       <div className="card grid grid-cols-2 lg:grid-cols-5 divide-x divide-y lg:divide-y-0 divide-line mb-14 overflow-hidden">
@@ -195,7 +222,7 @@ export default function Results({ result, navigate }: ResultsProps) {
         <Metric label="WM accuracy" value={`${(wmAccuracy * 100).toFixed(1)}%`}
                 sub="Watermark bit recovery rate" />
         <Metric label="Bit error rate" value={ber.toFixed(4)}
-                sub="Lower = better integrity" />
+                sub="Fragile-layer parity bits flipped" />
         <Metric label="Regions flagged" value={String(heatmapRegions.length)}
                 sub={activeFrame
                   ? `In frame ${activeFrame.frame}`
@@ -324,7 +351,9 @@ export default function Results({ result, navigate }: ResultsProps) {
                     onClick={() => setSelectedFrame(f.frame)}
                     title={isDeleted
                       ? `Frame ${f.frame}: DELETED — click to view its expected watermark`
-                      : `Frame ${f.frame}: ${f.status.toUpperCase()} (${(f.confidence * 100).toFixed(0)}%) — click to view spatial map`}
+                      : `Frame ${f.frame}: ${f.status.toUpperCase()}${
+                          f.blocksTotal ? ` — ${f.blocksTampered}/${f.blocksTotal} blocks flagged` : ''
+                        } — click to view spatial map`}
                     className={`w-11 h-11 rounded-lg flex items-center justify-center font-mono text-xs
                                 border transition-colors duration-150
                       ${isDeleted
@@ -538,9 +567,10 @@ export default function Results({ result, navigate }: ResultsProps) {
               <span className="w-3.5 h-3.5 rounded-sm bg-white/[0.06] border border-line" /> Stable signal (authentic)
             </span>
             <p className="text-sm text-ink-lo max-w-[320px] mt-3 pl-4 border-l border-line leading-relaxed">
-              Each cell maps to a 16×16 chroma sub-block. Red cells indicate the regenerated
-              SHA-256 parity does not match the extracted LSB parity — pinpointing the pixels
-              that were altered.
+              A fixed 32×32 grid scaled to the image, so one cell covers a region rather than a
+              single block. Red marks where flagged 32×32 blocks fall — those are blocks whose
+              regenerated SHA-256 parity disagreed with the parity extracted from the chroma
+              channel.
             </p>
           </div>
         </div>

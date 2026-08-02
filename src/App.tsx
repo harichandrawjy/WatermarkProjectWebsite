@@ -23,7 +23,11 @@ export interface TamperedRegion {
 export interface FrameResult {
   frame: number
   status: 'tampered' | 'authentic' | 'deleted'
-  confidence: number
+  /** Measured fragile-layer bit error rate for this frame. null on a deleted
+   *  frame — there is nothing left to measure. */
+  ber?: number | null
+  blocksTampered?: number
+  blocksTotal?: number
   tamperedRegions?: TamperedRegion[]
   // Per-frame fragile-watermark comparison (only present for tampered frames).
   watermarkOriginal?: string
@@ -32,9 +36,18 @@ export interface FrameResult {
 
 export interface AnalysisResult {
   status: 'tampered' | 'authentic'
-  confidence: number
+  /** Fraction of fragile-watermark parity bits recovered intact (1 - ber). */
   wmAccuracy: number
+  /** Real bit error rate: fraction of parity bits that flipped. */
   ber: number
+  /** Fraction of 32x32 blocks flagged — a localisation ratio, not a bit rate.
+   *  Kept separate from `ber` because conflating the two is what made the old
+   *  "Bit Error Rate" metric misleading. */
+  blockFlagRatio?: number
+  /** Why the verdict was `tampered`, in plain language. Empty when authentic.
+   *  Replaces the old synthesised "confidence" score, which measured
+   *  cleanliness and so inverted on a tampered verdict. */
+  reasons?: string[]
   tamperedRegions: TamperedRegion[]
   frameResults?: FrameResult[]
   fileName: string
