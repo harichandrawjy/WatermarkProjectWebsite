@@ -239,7 +239,10 @@ export default function Verify({ onComplete }: VerifyProps) {
       fd.append('file', file)
       fd.append('metadata', metadataJson)
 
-      const res = await fetch(`${API_BASE}/verify`, { method: 'POST', body: fd })
+      // authedFetch, not fetch: /verify stays public, but sending the token
+      // when we have one lets the backend record the run to the user's
+      // verification history. Signed out, this behaves exactly as before.
+      const res = await authedFetch(`${API_BASE}/verify`, { method: 'POST', body: fd })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
         throw new Error(`Server returned ${res.status}: ${text || res.statusText}`)
