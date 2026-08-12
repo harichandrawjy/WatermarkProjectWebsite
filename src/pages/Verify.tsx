@@ -59,7 +59,10 @@ export default function Verify({ onComplete }: VerifyProps) {
   const [manualId,     setManualId]     = useState('')
   const [metaFile,     setMetaFile]     = useState<File | null>(null)
   const [errorMsg,     setErrorMsg]     = useState('')
-  const [metaInfo,     setMetaInfo]     = useState<{ owner: string; mediaId: string } | null>(null)
+  // `owner` is the readable address; `ownerTag` is the 8-char id the metadata
+  // says should be embedded. Both are needed on Results: the tag is what the
+  // decoder can be compared against, the address is what a human recognises.
+  const [metaInfo,     setMetaInfo]     = useState<{ owner: string; mediaId: string; ownerTag: string } | null>(null)
   const [autoMeta,     setAutoMeta]     = useState<string | null>(null)
   const [autoLooking,  setAutoLooking]  = useState(false)
   const [autoFound,    setAutoFound]    = useState<boolean | null>(null)
@@ -94,7 +97,7 @@ export default function Verify({ onComplete }: VerifyProps) {
   // Pull owner + media id out of whichever metadata source the user picked,
   // so we can surface them before they click Verify.
   useEffect(() => {
-    const extract = (raw: string): { owner: string; mediaId: string } | null => {
+    const extract = (raw: string): { owner: string; mediaId: string; ownerTag: string } | null => {
       try {
         const obj = JSON.parse(raw) as Record<string, unknown>
         const pick = (...keys: string[]) => {
@@ -108,8 +111,11 @@ export default function Verify({ onComplete }: VerifyProps) {
         return {
           // `owner_email` first: since the short_id change, `owner_id` holds
           // the 8-char tag that was embedded, not a readable address.
-          owner:   pick('owner_email', 'owner', 'owner_id', 'ownerId'),
-          mediaId: pick('media', 'media_id', 'mediaId', 'id'),
+          owner:    pick('owner_email', 'owner', 'owner_id', 'ownerId'),
+          mediaId:  pick('media', 'media_id', 'mediaId', 'id'),
+          // The tag the metadata says SHOULD be in the pixels. Results shows it
+          // beside the recovered one so a match is visible rather than asserted.
+          ownerTag: pick('owner_id', 'ownerId'),
         }
       } catch { return null }
     }
@@ -186,6 +192,7 @@ export default function Verify({ onComplete }: VerifyProps) {
       setMetaInfo({
         owner: data.owner ?? (data.metadata.owner as string) ?? '',
         mediaId: data.media ?? (data.metadata.media as string) ?? '',
+        ownerTag: (data.metadata.owner_id as string) ?? '',
       })
     } catch {
       setAutoFound(false)
@@ -275,8 +282,9 @@ export default function Verify({ onComplete }: VerifyProps) {
         // an unrecoverable watermark look like a successfully recovered one.
         ownerId:    raw.ownerId,
         mediaId:    raw.mediaId,
-        ownerLabel: metaInfo?.owner,
-        mediaLabel: metaInfo?.mediaId,
+        ownerLabel:    metaInfo?.owner,
+        mediaLabel:    metaInfo?.mediaId,
+        ownerExpected: metaInfo?.ownerTag,
         watermarkOriginal: raw.watermarkOriginal,
         watermarkExtracted: raw.watermarkExtracted,
       }

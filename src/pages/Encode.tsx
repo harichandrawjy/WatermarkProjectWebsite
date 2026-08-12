@@ -11,6 +11,11 @@ type Stage = 'idle' | 'dragging' | 'preview' | 'encoding' | 'done' | 'error'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
+/** Mirrors MEDIA_ID_BYTES in the watermark engine — the fixed slot the media
+ *  id is embedded into. The backend enforces this too; this is only so the
+ *  user finds out before uploading rather than after. */
+const MEDIA_ID_BYTES = 8
+
 const ENCODE_STEPS = [
   'Reading media file...',
   'Building BCH(15,7) payload...',
@@ -55,6 +60,11 @@ export default function Encode({ navigate }: EncodeProps) {
   const [wmPreview,   setWmPreview]  = useState<string | null>(null)
   const [psnr,        setPsnr]       = useState(0)
   const [mediaId,     setMediaId]    = useState('')
+  // The engine embeds media_id into a fixed 8-BYTE slot. Anything longer used
+  // to be silently truncated — "foto_jokowi" became "foto_jok" with no warning,
+  // and the verify screen then showed an "extracted" value that looked wrong.
+  // Constraining the input means what you type is what lands in the pixels.
+  const mediaBytes = new TextEncoder().encode(mediaId).length
   const [encodedId,   setEncodedId]  = useState<string | null>(null)
   const [encodedKind, setEncodedKind] = useState<'image' | 'video'>('image')
   // The 8-char owner tag the backend assigned and embedded in the pixels —
@@ -314,7 +324,18 @@ export default function Encode({ navigate }: EncodeProps) {
                 </button>
               </div>
 
-              <div className="px-6 pb-6">
+              <div className="px-6 pb-6 flex flex-col gap-3">
+                {/* Stated at the one moment the user still has the file. The
+                    server keeps no copy — see the retention note in main.py —
+                    so this is the download that counts. */}
+                <div className="callout-warn">
+                  <Icon icon="lucide:download" className="shrink-0 mt-0.5" width="16" />
+                  <p>
+                    <strong className="text-ink-hi font-medium">Download it now — this is your copy.</strong>{' '}
+                    We don't keep your media on the server, only the metadata needed to verify it.
+                    Your metadata stays available from the Dashboard; the file itself does not.
+                  </p>
+                </div>
                 <div className="callout-accent">
                   <Icon icon="lucide:info" className="text-accent shrink-0 mt-0.5" width="16" />
                   <p>
@@ -407,22 +428,50 @@ export default function Encode({ navigate }: EncodeProps) {
 
               <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-line">
                 <div className="field">
-                  <label className="label">Owner</label>
+                  <div className="flex items-baseline justify-between">
+                    <label className="label">Owner</label>
+                    {/* Shown before encoding, not after: this tag is what the
+                        decoder reports back on the Results page, so seeing it
+                        here first stops it reading as a decoding error. */}
+                    {user?.short_id && (
+                      <span className="text-xs text-ink-faint">
+                        Owner ID <span className="font-mono text-ink-lo">{user.short_id}</span>
+                      </span>
+                    )}
+                  </div>
                   <div className="input-static">
                     <Icon icon="lucide:lock" width="14" className="text-accent shrink-0" />
                     <span className="font-mono truncate">{user?.email ?? '—'}</span>
                   </div>
+                  <p className="text-xs text-ink-faint mt-1.5">
+                    {user?.short_id
+                      ? <>Your files carry <span className="font-mono">{user.short_id}</span>, not your email — the slot is 8 bytes.</>
+                      : 'Derived from your account and embedded automatically.'}
+                  </p>
                 </div>
                 <div className="field">
-                  <label className="label" htmlFor="media-id">Media ID</label>
+                  <div className="flex items-baseline justify-between">
+                    <label className="label" htmlFor="media-id">Media ID</label>
+                    {/* Byte count, not character count: the watermark slot is 8
+                        BYTES, and one non-ASCII character can occupy up to 4 of
+                        them. maxLength alone would let "文件測試" through at
+                        4 characters and 12 bytes. */}
+                    <span className={`text-xs font-mono ${mediaBytes > MEDIA_ID_BYTES ? 'text-alert' : 'text-ink-faint'}`}>
+                      {mediaBytes}/{MEDIA_ID_BYTES}
+                    </span>
+                  </div>
                   <input
                     id="media-id"
                     type="text"
                     value={mediaId}
                     onChange={e => setMediaId(e.target.value)}
-                    placeholder="e.g. project-2026-001"
+                    maxLength={MEDIA_ID_BYTES}
+                    placeholder="img_001"
                     className="input font-mono"
                   />
+                  <p className="text-xs text-ink-faint mt-1.5">
+                    Up to {MEDIA_ID_BYTES} characters — this is embedded in the file exactly as typed.
+                  </p>
                 </div>
                 {errorMsg && (
                   <p className="sm:col-span-2 text-sm text-alert flex items-center gap-2">

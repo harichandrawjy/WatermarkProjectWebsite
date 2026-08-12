@@ -62,6 +62,16 @@ interface ExtractedLineProps {
   /** What the decoder actually pulled out of the pixels. */
   recovered?: string
   matched?: boolean
+  /**
+   * What to call the recovered value when it matches.
+   *
+   * The owner case needs its own word. The card shows an email, but the pixels
+   * carry an assigned 8-character tag — not a truncation of that email, a
+   * different identifier. Labelling it "extracted" implies the email itself
+   * should have come back, so a correct result reads as a decoding failure.
+   * Naming it "Owner ID" says what it actually is.
+   */
+  label?: string
 }
 
 /** The small mono line under each identity card.
@@ -72,18 +82,25 @@ interface ExtractedLineProps {
  * and on a mismatch, shows it next to the expected value so a corrupted
  * payload is visible rather than hidden behind a "Mismatch" badge.
  */
-function ExtractedLine({ expected, recovered, matched }: ExtractedLineProps) {
+function ExtractedLine({ expected, recovered, matched, label = 'expected' }: ExtractedLineProps) {
   if (!recovered) {
-    return <p className="meta mt-2">nothing recovered from the file</p>
+    return (
+      <p className="meta mt-2 break-all">
+        {expected && <>{label} <span className="text-ink">{expected}</span> · </>}
+        <span className="text-alert">nothing recovered from the file</span>
+      </p>
+    )
   }
-  // Only worth showing both when they actually differ — when the label IS the
-  // recovered value there's nothing to compare.
-  const showBoth = matched === false && expected && expected !== recovered
+  const failed = matched === false
+  // Both values, always — not only on failure. A lone value cannot be read as
+  // either "what should be there" or "what was found", so a correct result was
+  // indistinguishable from a wrong one. Showing the pair makes a match
+  // something you can see rather than something the badge asserts.
   return (
     <p className="meta mt-2 break-all">
-      {showBoth && <>expected <span className="text-ink">{expected}</span> · </>}
+      {expected && <>{label} <span className="text-ink">{expected}</span> · </>}
       extracted{' '}
-      <span className={matched === false ? 'text-alert' : 'text-ok'}>{printable(recovered)}</span>
+      <span className={failed ? 'text-alert' : 'text-ok'}>{printable(recovered)}</span>
     </p>
   )
 }
@@ -110,7 +127,8 @@ export default function Results({ result, navigate }: ResultsProps) {
     </div>
   )
 
-  const { status, wmAccuracy, ber, reasons, tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight,
+  const { status, wmAccuracy, ber, reasons, ownerExpected, archived, checkedAt, blocksTampered,
+          tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight,
           watermarkFound, ownerMatch, mediaMatch, ownerId, mediaId, ownerLabel, mediaLabel,
           watermarkOriginal, watermarkExtracted,
           missingFrames, reordered, duplicateFrames, framesTruncated } = result
@@ -195,6 +213,27 @@ export default function Results({ result, navigate }: ResultsProps) {
         </div>
       </header>
 
+      {/* Archived reports are rebuilt from a stored summary. Saying so up front
+          is the difference between "this report is missing sections" and "this
+          system didn't record them" — the first is a fact, the second is a bug
+          the user would reasonably infer. */}
+      {archived && (
+        <div className="callout-warn mb-6">
+          <Icon icon="lucide:archive" width="15" className="shrink-0 mt-0.5" />
+          <span>
+            Archived report{checkedAt && <> from {new Date(checkedAt).toLocaleString()}</>}.
+            The verdict, reasons and measurements were recorded; the spatial map and
+            watermark comparison were not, since they're derived from the file itself
+            and the server keeps no copy.{' '}
+            <button type="button" onClick={() => navigate('verify')}
+                    className="text-accent font-medium hover:underline">
+              Re-verify the file
+            </button>{' '}
+            to see them.
+          </span>
+        </div>
+      )}
+
       {/* ── Why it was flagged ──
           A tampered verdict is a single boolean OR'd from unrelated signals,
           so the verdict alone can't say whether the file was edited, re-encoded
@@ -223,11 +262,19 @@ export default function Results({ result, navigate }: ResultsProps) {
                 sub="Watermark bit recovery rate" />
         <Metric label="Bit error rate" value={ber.toFixed(4)}
                 sub="Fragile-layer parity bits flipped" />
-        <Metric label="Regions flagged" value={String(heatmapRegions.length)}
-                sub={activeFrame
-                  ? `In frame ${activeFrame.frame}`
-                  : (tampered ? 'Areas of concern localized' : 'No regions flagged')}
-                tone={heatmapRegions.length > 0 ? 'alert' : 'neutral'} />
+        {/* On an archived report there is no region data, so a literal 0 would
+            read as "nothing was flagged" — which on a tampered verdict is the
+            opposite of true. Show the stored block count, or nothing. */}
+        <Metric label="Regions flagged"
+                value={archived
+                  ? (typeof blocksTampered === 'number' ? `${blocksTampered} blocks` : '—')
+                  : String(heatmapRegions.length)}
+                sub={archived
+                  ? 'Recorded at check time'
+                  : activeFrame
+                    ? `In frame ${activeFrame.frame}`
+                    : (tampered ? 'Areas of concern localized' : 'No regions flagged')}
+                tone={(archived ? (blocksTampered ?? 0) : heatmapRegions.length) > 0 ? 'alert' : 'neutral'} />
         <Metric label="Media type" value={fileType === 'video' ? 'Video' : 'Image'}
                 sub="Analyzed file container" />
       </div>
@@ -253,9 +300,17 @@ export default function Results({ result, navigate }: ResultsProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 { icon: 'lucide:hash', label: 'Media ID', match: mediaMatch,
-                  display: mediaLabel || mediaId, expected: mediaLabel, recovered: mediaId },
-                { icon: 'lucide:user', label: 'Owner ID', match: ownerMatch,
-                  display: ownerLabel || ownerId, expected: ownerLabel, recovered: ownerId },
+                  display: mediaLabel || mediaId,
+                  expected: mediaLabel, recovered: mediaId,
+                  subLabel: 'media ID' },
+                // The owner card compares TAG against TAG. `ownerLabel` is an
+                // email and `ownerId` an 8-char tag, so pairing those two would
+                // compare unlike things — `ownerExpected` is the tag the
+                // metadata says should be embedded.
+                { icon: 'lucide:user', label: 'Owner', match: ownerMatch,
+                  display: ownerLabel || ownerId,
+                  expected: ownerExpected, recovered: ownerId,
+                  subLabel: 'Owner ID' },
               ].map(f => (
                 <div key={f.label} className="well px-5 py-4">
                   <div className="flex items-center justify-between gap-3 mb-2">
@@ -271,7 +326,8 @@ export default function Results({ result, navigate }: ResultsProps) {
                   <p className="font-mono text-md text-ink-hi break-all">
                     {f.display || <span className="text-ink-faint">— not provided —</span>}
                   </p>
-                  <ExtractedLine expected={f.expected} recovered={f.recovered} matched={f.match} />
+                  <ExtractedLine expected={f.expected} recovered={f.recovered} matched={f.match}
+                                 label={f.subLabel} />
                 </div>
               ))}
             </div>
@@ -497,7 +553,10 @@ export default function Results({ result, navigate }: ResultsProps) {
         </section>
       )}
 
-      {/* ── Sub-block parity map ── */}
+      {/* Hidden on archived reports. The grid is built from `tamperedRegions`,
+          which isn't stored — so it would draw an entirely clean map, i.e.
+          "no tampering found", directly beneath a Tampered verdict. */}
+      {!archived && (
       <section className="mb-14">
         <SectionHead
           icon="lucide:activity" tone="text-accent"
@@ -575,6 +634,7 @@ export default function Results({ result, navigate }: ResultsProps) {
           </div>
         </div>
       </section>
+      )}
 
       {/* ── Actions ── */}
       <div className="flex flex-wrap gap-3">

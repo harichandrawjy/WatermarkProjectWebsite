@@ -63,6 +63,22 @@ export interface AnalysisResult {
   // Display only — never evidence of what the file contains.
   ownerLabel?: string
   mediaLabel?: string
+  /** The 8-char owner tag the metadata says should be embedded. Distinct from
+   *  `ownerLabel` (an email) — this is the value `ownerId` is comparable to,
+   *  so both can be shown side by side rather than asserting a match. */
+  ownerExpected?: string
+  /**
+   * Rebuilt from a stored verification record rather than produced by a live
+   * check. Only a summary is kept — the heatmap, watermark comparison and
+   * frame timeline all derive from pixels the server deliberately does not
+   * retain — so those sections are suppressed rather than rendered empty.
+   */
+  archived?: boolean
+  /** When the archived check was originally run. */
+  checkedAt?: string
+  /** Flagged / total 32x32 spatial blocks for an image check. */
+  blocksTampered?: number
+  blocksTotal?: number
   framesChecked?: number
   frameTamperRate?: number
   imageWidth?: number
@@ -133,7 +149,7 @@ function AppShell() {
         {page === 'about'     && <About />}
         {page === 'login'     && <Login navigate={navigate} />}
         {page === 'register'  && <Register navigate={navigate} />}
-        {page === 'dashboard' && <Dashboard navigate={navigate} />}
+        {page === 'dashboard' && <Dashboard navigate={navigate} onOpenResult={handleVerifyComplete} />}
         {page === 'forgot'    && <ForgotPassword navigate={navigate} />}
       </main>
 

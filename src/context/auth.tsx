@@ -15,6 +15,11 @@ const IDLE_LIMIT_MS = 15 * 60 * 1000   // 15 minutes
 export interface AuthUser {
   id:    string
   email: string
+  /** The 8-character identifier actually embedded in this user's watermarks.
+   *  Not a truncation of the email — an assigned tag, because the engine's
+   *  owner slot is only 8 bytes. Populated from /auth/me; login and register
+   *  responses don't carry it. */
+  short_id?: string
 }
 
 interface AuthContextValue {
@@ -216,6 +221,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [token])
+
+  // Backfill short_id. Login and register return only { id, email }, so the
+  // watermark tag is fetched once per session from /auth/me and merged in.
+  // Silent on failure — it is display-only, and nothing should break if the
+  // backend is an older build that doesn't return it.
+  useEffect(() => {
+    if (!token || !user || user.short_id) return
+    let cancelled = false
+    fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? (r.json() as Promise<AuthUser>) : null))
+      .then(me => {
+        if (cancelled || !me?.short_id) return
+        setUser(prev => {
+          if (!prev) return prev
+          const merged = { ...prev, short_id: me.short_id }
+          localStorage.setItem(USER_KEY, JSON.stringify(merged))
+          return merged
+        })
+      })
+      .catch(() => { /* display-only */ })
+    return () => { cancelled = true }
+  }, [token, user?.short_id])
 
   const login = async (email: string, password: string) => {
     const res = await fetch(`${API_BASE}/auth/login`, {
