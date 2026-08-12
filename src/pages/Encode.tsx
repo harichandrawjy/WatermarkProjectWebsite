@@ -65,8 +65,17 @@ export default function Encode({ navigate }: EncodeProps) {
   // and the verify screen then showed an "extracted" value that looked wrong.
   // Constraining the input means what you type is what lands in the pixels.
   const mediaBytes = new TextEncoder().encode(mediaId).length
+  // Encoder choice: invisible-only (default) vs. invisible + a visible "Aegis"
+  // overlay burned into the pixels.
+  const [encoder,     setEncoder]    = useState<'default' | 'visible'>('default')
+  // Output format — restricted to LOSSLESS containers only, because the
+  // invisible watermark cannot survive a lossy re-encode. Options depend on
+  // whether the upload is an image or a video.
+  const [outFormat,   setOutFormat]  = useState('')
   const [encodedId,   setEncodedId]  = useState<string | null>(null)
   const [encodedKind, setEncodedKind] = useState<'image' | 'video'>('image')
+  // The format actually used for the finished file — drives the download name.
+  const [encodedFormat, setEncodedFormat] = useState('')
   // The 8-char owner tag the backend assigned and embedded in the pixels —
   // not the email, which is too long to fit the watermark's owner slot.
   const [ownerTag,    setOwnerTag]   = useState<string | null>(null)
@@ -77,8 +86,16 @@ export default function Encode({ navigate }: EncodeProps) {
     if (!f.type.startsWith('image/') && !f.type.startsWith('video/')) return
     setFile(f)
     setPreview(URL.createObjectURL(f))
+    // Default to the lossless container for this media kind.
+    setOutFormat(f.type.startsWith('video/') ? 'mkv' : 'png')
     setStage('preview')
   }
+
+  // Lossless-only output options, filtered by the uploaded media kind.
+  const isVideo = file?.type.startsWith('video/') ?? false
+  const FORMAT_OPTIONS = isVideo
+    ? [{ v: 'mkv', label: 'MKV · FFV1 (lossless)' }, { v: 'avi', label: 'AVI · FFV1 (lossless)' }]
+    : [{ v: 'png', label: 'PNG (lossless)' },        { v: 'webp', label: 'WEBP (lossless)' }]
 
   const onDrop     = useCallback((e: React.DragEvent) => { e.preventDefault(); setStage('idle'); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }, [])
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setStage('dragging') }
@@ -124,6 +141,8 @@ export default function Encode({ navigate }: EncodeProps) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('media_id', mediaId.trim())
+      fd.append('encoder', encoder)
+      fd.append('format', outFormat)
 
       const res = await authedFetch(`${API_BASE}/encode`, {
         method: 'POST',
@@ -142,6 +161,7 @@ export default function Encode({ navigate }: EncodeProps) {
       setPsnr(data.psnr_db)
       setEncodedId(data.id)
       setEncodedKind(data.kind)
+      setEncodedFormat(outFormat)
       const tag = (data.metadata as { owner_id?: unknown })?.owner_id
       setOwnerTag(typeof tag === 'string' ? tag : null)
       setProgress(100)
@@ -158,7 +178,7 @@ export default function Encode({ navigate }: EncodeProps) {
     const res = await fetch(wmPreview)
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
-    const ext = encodedKind === 'video' ? 'mkv' : 'png'
+    const ext = encodedFormat || (encodedKind === 'video' ? 'mkv' : 'png')
     const base = file.name.replace(/\.[^.]+$/, '')
     const a = document.createElement('a')
     a.href = url
@@ -182,6 +202,7 @@ export default function Encode({ navigate }: EncodeProps) {
     setFile(null); setPreview(null); setWmPreview(null)
     setStage('idle'); setProgress(0); setStepIdx(0); setPsnr(0)
     setEncodedId(null); setOwnerTag(null); setErrorMsg('')
+    setEncoder('default'); setOutFormat(''); setEncodedFormat('')
   }
 
   // Sign-in gate: encode now requires an authenticated user so we can tie
@@ -473,6 +494,54 @@ export default function Encode({ navigate }: EncodeProps) {
                     Up to {MEDIA_ID_BYTES} characters — this is embedded in the file exactly as typed.
                   </p>
                 </div>
+                {/* ── Encoder choice ── */}
+                <div className="field sm:col-span-2">
+                  <label className="label mb-1.5 block">Encoder</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {([
+                      { v: 'default', title: 'Invisible only',
+                        desc: 'Semi-fragile watermark embedded in the pixels.' },
+                      { v: 'visible', title: 'Invisible + visible “Aegis”',
+                        desc: 'Adds a visible “Aegis” mark in the bottom-right.' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.v}
+                        type="button"
+                        onClick={() => setEncoder(opt.v)}
+                        className={`text-left rounded-xl border p-3.5 transition-colors
+                          ${encoder === opt.v
+                            ? 'border-accent bg-accent-soft'
+                            : 'border-line hover:border-accent-line bg-surface'}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0
+                            ${encoder === opt.v ? 'border-accent' : 'border-line-strong'}`}>
+                            {encoder === opt.v && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
+                          </span>
+                          <span className="text-sm font-medium text-ink-hi">{opt.title}</span>
+                        </div>
+                        <p className="text-xs text-ink-lo leading-relaxed pl-5">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Output format ── */}
+                <div className="field sm:col-span-2">
+                  <label className="label" htmlFor="out-format">Output format</label>
+                  <select
+                    id="out-format"
+                    value={outFormat}
+                    onChange={e => setOutFormat(e.target.value)}
+                    className="input font-mono">
+                    {FORMAT_OPTIONS.map(o => (
+                      <option key={o.v} value={o.v}>{o.label}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-ink-faint mt-1.5">
+                    Lossless only — the invisible watermark can't survive a lossy re-encode.
+                  </p>
+                </div>
+
                 {errorMsg && (
                   <p className="sm:col-span-2 text-sm text-alert flex items-center gap-2">
                     <Icon icon="lucide:alert-circle" width="14" /> {errorMsg}
