@@ -95,6 +95,26 @@ export interface AnalysisResult {
   // side-by-side comparison on the Results page.
   watermarkOriginal?: string
   watermarkExtracted?: string
+  /** Transparent PNG holding only the red flagged cells, for overlaying on the
+   *  source image. Absent when nothing was flagged, and on video. */
+  watermarkMask?: string
+  /**
+   * Flagged cells grouped into edits, in source-image pixels.
+   *
+   * The extent of the *flagged cells*, which is a lower bound on the edit:
+   * localisation recall is ~0.4, so the real edited region routinely runs
+   * past the box. Label it accordingly — it is not the tampered region.
+   */
+  watermarkClusters?: { x: number; y: number; w: number; h: number; cells: number }[]
+  /**
+   * Object URL of the file the user just uploaded, so the report can show the
+   * flagged blocks over the real picture.
+   *
+   * Created and held entirely in the browser — it is never sent anywhere, and
+   * the server still keeps no copy of the media. Consequently it exists only
+   * for a live check: an archived report has no file to point at.
+   */
+  sourcePreview?: string
 }
 
 export default function App() {

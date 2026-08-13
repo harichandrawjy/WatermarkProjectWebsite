@@ -287,6 +287,11 @@ export default function Verify({ onComplete }: VerifyProps) {
         ownerExpected: metaInfo?.ownerTag,
         watermarkOriginal: raw.watermarkOriginal,
         watermarkExtracted: raw.watermarkExtracted,
+        watermarkMask: raw.watermarkMask,
+        watermarkClusters: raw.watermarkClusters,
+        // Local blob URL only — this is the copy already in the browser, not a
+        // round trip through the server, which retains nothing.
+        sourcePreview: preview ?? undefined,
       }
       setProgress(100)
       setStepIdx(VERIFY_STEPS.length - 1)

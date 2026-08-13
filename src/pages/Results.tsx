@@ -107,6 +107,11 @@ function ExtractedLine({ expected, recovered, matched, label = 'expected' }: Ext
 
 export default function Results({ result, navigate }: ResultsProps) {
   const [selectedFrame, setSelectedFrame] = useState<number | null>(null)
+  // 'pattern' compares expected vs extracted; 'photo' drops the noise texture
+  // and puts the flagged cells on the real image. Two different questions —
+  // where the corruption is, and what it corrupted — so they take turns rather
+  // than competing for the same space.
+  const [wmView, setWmView] = useState<'pattern' | 'photo'>('pattern')
 
   // Empty state
   if (!result) return (
@@ -130,7 +135,7 @@ export default function Results({ result, navigate }: ResultsProps) {
   const { status, wmAccuracy, ber, reasons, ownerExpected, archived, checkedAt, blocksTampered,
           tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight,
           watermarkFound, ownerMatch, mediaMatch, ownerId, mediaId, ownerLabel, mediaLabel,
-          watermarkOriginal, watermarkExtracted,
+          watermarkOriginal, watermarkExtracted, watermarkMask, watermarkClusters, sourcePreview,
           missingFrames, reordered, duplicateFrames, framesTruncated } = result
   const tampered = status === 'tampered'
 
@@ -154,6 +159,23 @@ export default function Results({ result, navigate }: ResultsProps) {
   const wmOrig = fileType === 'video' ? activeFrame?.watermarkOriginal : watermarkOriginal
   const wmExt  = fileType === 'video' ? activeFrame?.watermarkExtracted : watermarkExtracted
   const activeIsDeleted = fileType === 'video' && activeFrame?.status === 'deleted'
+
+  // The "on photo" view needs the actual picture, which only exists for a live
+  // image check: video would need the clip seeked to the selected frame (which
+  // browsers cannot do exactly), and an archived report has no file at all.
+  const canOverlayPhoto = fileType === 'image' && !archived && Boolean(sourcePreview)
+  // Gate on the capability too, so a stale 'photo' selection left over from a
+  // previous report can't blank the panel on one that has no picture to show.
+  const showPhoto = canOverlayPhoto && wmView === 'photo'
+
+  // Each pattern cell covers a 16x16 square of the source image, and the grid is
+  // floor-divided — so on a height like 1080 the pattern stops 8px short of the
+  // bottom. Sizing the overlay by that exact fraction keeps the red squares on
+  // the pixels they actually refer to instead of stretching them ~1% out of
+  // place. Without dimensions, fall back to filling the frame.
+  const maskW = imageWidth  ? (Math.floor(imageWidth  / 16) * 16) / imageWidth  : 1
+  const maskH = imageHeight ? (Math.floor(imageHeight / 16) * 16) / imageHeight : 1
+  const clusters = watermarkClusters ?? []
 
   // Temporal anomalies (video only) — deletions / reorders / truncation that
   // the decoder localized without cascading across later frames.
@@ -497,14 +519,80 @@ export default function Results({ result, navigate }: ResultsProps) {
           <SectionHead
             icon="lucide:git-compare" tone="text-accent"
             title="Extracted watermark"
-            sub={<>
-              The fragile pattern that should be present vs. what was actually extracted
-              {fileType === 'video' && activeFrame ? ` from frame ${activeFrame.frame}` : ' from this file'} —
-              red bits mark where it was corrupted by tampering
-            </>}
+            sub={showPhoto
+              ? <>Where the corrupted parity cells fall on the image itself</>
+              : <>
+                  The fragile pattern that should be present vs. what was actually extracted
+                  {fileType === 'video' && activeFrame ? ` from frame ${activeFrame.frame}` : ' from this file'} —
+                  red bits mark where it was corrupted by tampering
+                </>}
           />
 
           <div className="card p-6">
+            {canOverlayPhoto && (
+              <div className="flex justify-end mb-5">
+                <div className="inline-flex gap-1 p-1 rounded-lg bg-surface-inset border border-line">
+                  {([
+                    ['pattern', 'lucide:grid-2x2', 'Pattern'],
+                    ['photo',   'lucide:image',    'On photo'],
+                  ] as const).map(([mode, icon, text]) => (
+                    <button key={mode} onClick={() => setWmView(mode)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
+                        wmView === mode
+                          ? 'bg-white/[0.07] text-ink-hi'
+                          : 'text-ink-lo hover:text-ink-hi'}`}>
+                      <Icon icon={icon} width="13" />
+                      {text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {showPhoto ? (
+              <figure className="flex flex-col items-center gap-3">
+                {/* The photo sizes the box itself — no fixed aspect ratio and no
+                    object-fit, so nothing is letterboxed or cropped and the
+                    overlay's percentages stay true to the source coordinates. */}
+                <div className="relative w-full max-w-[420px] well overflow-hidden">
+                  <img src={sourcePreview} alt="analyzed file"
+                       className="block w-full h-auto opacity-50" />
+                  {watermarkMask && (
+                    <img src={watermarkMask} alt="flagged parity cells"
+                         className="absolute top-0 left-0"
+                         style={{ width:  `${maskW * 100}%`,
+                                  height: `${maskH * 100}%`,
+                                  imageRendering: 'pixelated' }} />
+                  )}
+                  {/* Cluster boxes are in true source pixels, so they convert
+                      straight to percentages of the photo — no 16px-grid
+                      correction, unlike the mask above. Padded outward by a
+                      cell so the outline doesn't sit on top of the red it
+                      encloses. */}
+                  {imageWidth && imageHeight && clusters.map((c, i) => (
+                    <div key={i} className="absolute border border-alert/70 rounded-[3px] pointer-events-none"
+                         style={{ left:   `${((c.x - 8) / imageWidth) * 100}%`,
+                                  top:    `${((c.y - 8) / imageHeight) * 100}%`,
+                                  width:  `${((c.w + 16) / imageWidth) * 100}%`,
+                                  height: `${((c.h + 16) / imageHeight) * 100}%` }} />
+                  ))}
+                </div>
+                <p className="text-xs text-ink-lo text-center max-w-[420px]">
+                  {watermarkMask
+                    ? <>Image dimmed · <span className="text-alert">red = parity mismatch</span>, at 16&nbsp;px resolution</>
+                    : 'No parity cells were flagged — the fragile layer is intact across the whole image'}
+                </p>
+                {clusters.length > 0 && (
+                  <p className="text-xs text-ink-faint text-center max-w-[420px] leading-relaxed">
+                    {clusters.length === 1 ? 'The outline groups' : `The ${clusters.length} outlines group`}
+                    {' '}the flagged cells into {clusters.length === 1 ? 'one edit' : 'separate edits'},
+                    {' '}bounding what was <em>detected</em> at 16&nbsp;px granularity. Detection here is
+                    {' '}deliberately conservative: dependable about where an edit is, but partial about
+                    {' '}how far it reaches. Read the box as the edit located, not as its full extent.
+                  </p>
+                )}
+              </figure>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <figure className="flex flex-col items-center gap-3">
                 <figcaption className="pill-ok">
@@ -542,98 +630,18 @@ export default function Results({ result, navigate }: ResultsProps) {
                 </p>
               </figure>
             </div>
+            )}
 
             <p className="text-sm text-ink-lo max-w-[640px] mx-auto mt-7 pt-6 border-t border-line text-center leading-relaxed">
               The fragile watermark is a pseudo-random parity pattern keyed to the media's
-              identity, so it looks like noise — but any region that was edited flips its bits,
-              surfacing as red blocks that pinpoint exactly where the tampering happened.
+              identity, so it looks like noise. Each cell carries one parity bit, derived by
+              SHA-256 and stored in the chroma channel; red marks the cells whose parity,
+              regenerated at verification, disagreed with the parity extracted from the file —
+              which is precisely where the pixels were edited.
               {fileType === 'video' && ' Select a tampered (red) frame above to inspect its watermark.'}
             </p>
           </div>
         </section>
-      )}
-
-      {/* Hidden on archived reports. The grid is built from `tamperedRegions`,
-          which isn't stored — so it would draw an entirely clean map, i.e.
-          "no tampering found", directly beneath a Tampered verdict. */}
-      {!archived && (
-      <section className="mb-14">
-        <SectionHead
-          icon="lucide:activity" tone="text-accent"
-          title="Sub-block parity map"
-          sub={activeFrame
-            ? `Frame ${activeFrame.frame} · ${activeFrame.status === 'tampered' ? 'tampered' : 'authentic'} · click any frame above to switch`
-            : 'Chroma sub-blocks where the SHA-256 LSB parity did not match'}
-        />
-
-        <div className="card p-6 flex flex-col md:flex-row items-center gap-8">
-
-          {/* 32×32 grid scaled to actual image coordinates */}
-          <div className="w-full max-w-[460px] p-2 well shrink-0">
-            {(() => {
-              const COLS = 32
-              const ROWS = 32
-              // Fallback: if backend didn't send image dimensions, assume square sized
-              // by the largest tampered-region extent. Avoids false aspect-ratio distortion.
-              const fallbackMax = heatmapRegions.length > 0
-                ? Math.max(...heatmapRegions.flatMap(r => [r.x + r.w, r.y + r.h]))
-                : 320
-              const maxX = imageWidth  ?? fallbackMax
-              const maxY = imageHeight ?? fallbackMax
-
-              const cells = Array.from({ length: COLS * ROWS }, (_, i) => {
-                const col = i % COLS
-                const row = Math.floor(i / COLS)
-                const cellX    = (col / COLS) * maxX
-                const cellXEnd = ((col + 1) / COLS) * maxX
-                const cellY    = (row / ROWS) * maxY
-                const cellYEnd = ((row + 1) / ROWS) * maxY
-
-                const hits = heatmapRegions.filter(r =>
-                  r.x < cellXEnd && (r.x + r.w) > cellX &&
-                  r.y < cellYEnd && (r.y + r.h) > cellY
-                ).length
-                const inRegion = hits > 0
-                const heat = inRegion ? Math.min(0.55 + hits * 0.15, 1) : 1
-
-                return (
-                  <div key={i} style={{
-                    backgroundColor: inRegion
-                      ? `rgba(244, 63, 94, ${heat})`
-                      : 'rgba(255, 255, 255, 0.045)',
-                  }} />
-                )
-              })
-
-              return (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${COLS}, 1fr)`,
-                  gap: '1px',
-                  aspectRatio: `${maxX} / ${maxY}`,
-                }}>
-                  {cells}
-                </div>
-              )
-            })()}
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <span className="flex items-center gap-2.5 text-sm text-ink">
-              <span className="w-3.5 h-3.5 rounded-sm bg-alert" /> High disruption (tampered)
-            </span>
-            <span className="flex items-center gap-2.5 text-sm text-ink">
-              <span className="w-3.5 h-3.5 rounded-sm bg-white/[0.06] border border-line" /> Stable signal (authentic)
-            </span>
-            <p className="text-sm text-ink-lo max-w-[320px] mt-3 pl-4 border-l border-line leading-relaxed">
-              A fixed 32×32 grid scaled to the image, so one cell covers a region rather than a
-              single block. Red marks where flagged 32×32 blocks fall — those are blocks whose
-              regenerated SHA-256 parity disagreed with the parity extracted from the chroma
-              channel.
-            </p>
-          </div>
-        </div>
-      </section>
       )}
 
       {/* ── Actions ── */}
