@@ -66,6 +66,7 @@ export default function Verify({ onComplete }: VerifyProps) {
   const [autoMeta,     setAutoMeta]     = useState<string | null>(null)
   const [autoLooking,  setAutoLooking]  = useState(false)
   const [autoFound,    setAutoFound]    = useState<boolean | null>(null)
+  const [autoError,    setAutoError]    = useState<string | null>(null)
   const [history,      setHistory]      = useState<HistoryItem[]>([])
   const [historyOpen,  setHistoryOpen]  = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -180,11 +181,22 @@ export default function Verify({ onComplete }: VerifyProps) {
     setAutoFound(null)
     setAutoMeta(null)
     setMetaInfo(null)
+    setAutoError(null)
     try {
       const fd = new FormData()
       fd.append('file', f)
       const res = await fetch(`${API_BASE}/lookup`, { method: 'POST', body: fd })
-      if (!res.ok) throw new Error('not found')
+      if (!res.ok) {
+        // /lookup returns two different 404s — "could not extract" (nothing
+        // readable in the pixels) and "no database record for owner=X media=Y"
+        // (watermark read fine, no matching row). They need opposite fixes, so
+        // carry the server's message through instead of collapsing both into
+        // a generic "not found".
+        const detail = await res.json()
+          .then((d: { detail?: string }) => d?.detail)
+          .catch(() => undefined)
+        throw new Error(detail || `lookup failed (${res.status})`)
+      }
       const data = await res.json() as { metadata: Record<string, unknown>; owner?: string; media?: string }
       const metaStr = JSON.stringify(data.metadata)
       setAutoMeta(metaStr)
@@ -194,9 +206,10 @@ export default function Verify({ onComplete }: VerifyProps) {
         mediaId: data.media ?? (data.metadata.media as string) ?? '',
         ownerTag: (data.metadata.owner_id as string) ?? '',
       })
-    } catch {
+    } catch (e) {
       setAutoFound(false)
       setAutoMeta(null)
+      setAutoError(e instanceof Error ? e.message : String(e))
     } finally {
       setAutoLooking(false)
     }
@@ -466,6 +479,9 @@ export default function Verify({ onComplete }: VerifyProps) {
                         <Icon icon="lucide:alert-triangle" width="15" className="text-warn shrink-0 mt-0.5" />
                         <div>
                           <p className="text-warn font-medium mb-1">No matching record found</p>
+                          {autoError && (
+                            <p className="text-ink-lo mb-1 font-mono text-[11px] break-words">{autoError}</p>
+                          )}
                           <p className="text-ink-lo">
                             This file may not be in the database. Try{' '}
                             <strong className="text-ink-hi font-medium">Specific ID</strong> or{' '}

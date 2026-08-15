@@ -94,16 +94,22 @@ export default function Dashboard({ navigate, onOpenResult }: DashboardProps) {
   // is the expected case, not an error — so explain it rather than reporting a
   // bare HTTP status the user can do nothing with.
   const downloadFile = async (it: MediaItem) => {
-    const ext = it.kind === 'video' ? 'mkv' : 'png'
     setGoneId(null)
     try {
-      const res = await fetch(`${API_BASE}/files/${it.id}_wm.${ext}`)
+      // Resolve by id, not by guessing the filename. Output format is now
+      // selectable (png/webp, mkv/avi) and isn't stored on the row, so the old
+      // `${id}_wm.${kind === 'video' ? 'mkv' : 'png'}` guess 404s for anything
+      // encoded as WEBP or AVI even when the file is present.
+      const res = await fetch(`${API_BASE}/media/${it.id}`)
       if (!res.ok) throw new Error(String(res.status))
       const blob = await res.blob()
+      // The server reports the real filename; fall back to the media kind's
+      // default only if the header is missing.
+      const served = res.headers.get('X-Output-Filename') || ''
+      const ext = served.match(/\.([^.]+)$/)?.[1] || (it.kind === 'video' ? 'mkv' : 'png')
+      const base = it.file_name?.replace(/\.[^.]+$/, '') || it.media || it.id
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      // Prefer the original name, matching what Encode names its download.
-      const base = it.file_name?.replace(/\.[^.]+$/, '') || it.media || it.id
       a.download = `watermarked_${base}.${ext}`
       a.click()
       URL.revokeObjectURL(a.href)

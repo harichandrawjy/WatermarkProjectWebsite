@@ -48,6 +48,9 @@ interface EncodeResponse {
   metadata_url: string
   metadata: Record<string, unknown>
   psnr_db: number
+  /** PNG data URL of the fragile pattern embedded in the file's chroma
+   *  channel — the same image Verify compares against after extraction. */
+  watermark_pattern?: string | null
 }
 
 export default function Encode({ navigate }: EncodeProps) {
@@ -65,9 +68,6 @@ export default function Encode({ navigate }: EncodeProps) {
   // and the verify screen then showed an "extracted" value that looked wrong.
   // Constraining the input means what you type is what lands in the pixels.
   const mediaBytes = new TextEncoder().encode(mediaId).length
-  // Encoder choice: invisible-only (default) vs. invisible + a visible "Aegis"
-  // overlay burned into the pixels.
-  const [encoder,     setEncoder]    = useState<'default' | 'visible'>('default')
   // Output format — restricted to LOSSLESS containers only, because the
   // invisible watermark cannot survive a lossy re-encode. Options depend on
   // whether the upload is an image or a video.
@@ -79,6 +79,10 @@ export default function Encode({ navigate }: EncodeProps) {
   // The 8-char owner tag the backend assigned and embedded in the pixels —
   // not the email, which is too long to fit the watermark's owner slot.
   const [ownerTag,    setOwnerTag]   = useState<string | null>(null)
+  // The fragile pattern actually embedded, rendered as an image. Shown so the
+  // watermark stops being an abstraction — this is the "before" half of the
+  // comparison Verify draws after extracting it back out of a file.
+  const [wmPattern,   setWmPattern]  = useState<string | null>(null)
   const [errorMsg,    setErrorMsg]   = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -141,7 +145,6 @@ export default function Encode({ navigate }: EncodeProps) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('media_id', mediaId.trim())
-      fd.append('encoder', encoder)
       fd.append('format', outFormat)
 
       const res = await authedFetch(`${API_BASE}/encode`, {
@@ -164,6 +167,7 @@ export default function Encode({ navigate }: EncodeProps) {
       setEncodedFormat(outFormat)
       const tag = (data.metadata as { owner_id?: unknown })?.owner_id
       setOwnerTag(typeof tag === 'string' ? tag : null)
+      setWmPattern(data.watermark_pattern ?? null)
       setProgress(100)
       setStepIdx(ENCODE_STEPS.length - 1)
       setStage('done')
@@ -200,9 +204,9 @@ export default function Encode({ navigate }: EncodeProps) {
 
   const reset = () => {
     setFile(null); setPreview(null); setWmPreview(null)
-    setStage('idle'); setProgress(0); setStepIdx(0); setPsnr(0)
+    setStage('idle'); setProgress(0); setStepIdx(0); setPsnr(0); setWmPattern(null)
     setEncodedId(null); setOwnerTag(null); setErrorMsg('')
-    setEncoder('default'); setOutFormat(''); setEncodedFormat('')
+    setOutFormat(''); setEncodedFormat('')
   }
 
   // Sign-in gate: encode now requires an authenticated user so we can tie
@@ -316,6 +320,38 @@ export default function Encode({ navigate }: EncodeProps) {
                   </div>
                 </figure>
               </div>
+
+              {/* ── What was embedded ──
+                  The watermark is otherwise entirely abstract: the two images
+                  above look identical, so "it's in there" has to be taken on
+                  trust. Rendering the pattern makes it a thing you can look at,
+                  and it is the same image Verify shows beside the one it
+                  extracts back out — so the comparison there means something. */}
+              {wmPattern && (
+                <div className="px-6 py-5 border-t border-line flex flex-col sm:flex-row gap-5 items-start">
+                  <div className="w-[132px] shrink-0">
+                    <img src={wmPattern} alt="embedded watermark pattern"
+                         className="w-full aspect-square object-contain rounded-lg border border-line bg-black"
+                         style={{ imageRendering: 'pixelated' }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-ink-hi mb-1.5">
+                      The watermark now inside this file
+                    </p>
+                    <p className="text-sm text-ink-lo leading-relaxed mb-2">
+                      Each square is one bit, hidden across the image's colour channel. The
+                      pattern is not random — it is computed from your owner ID{' '}
+                      {ownerTag && <span className="font-mono text-ink">{ownerTag}</span>} and
+                      media ID, so the verifier can rebuild exactly this image and compare.
+                    </p>
+                    <p className="text-xs text-ink-faint leading-relaxed">
+                      Edit the photo and the bits under the edited area flip. Verify shows this
+                      pattern next to the one it recovers, with the differences in red — that
+                      is how tampering is located.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Metadata row */}
               <dl className="grid grid-cols-3 divide-x divide-line border-y border-line card-strip">
@@ -494,37 +530,6 @@ export default function Encode({ navigate }: EncodeProps) {
                     Up to {MEDIA_ID_BYTES} characters — this is embedded in the file exactly as typed.
                   </p>
                 </div>
-                {/* ── Encoder choice ── */}
-                <div className="field sm:col-span-2">
-                  <label className="label mb-1.5 block">Encoder</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {([
-                      { v: 'default', title: 'Invisible only',
-                        desc: 'Semi-fragile watermark embedded in the pixels.' },
-                      { v: 'visible', title: 'Invisible + visible “Aegis”',
-                        desc: 'Adds a visible “Aegis” mark in the bottom-right.' },
-                    ] as const).map(opt => (
-                      <button
-                        key={opt.v}
-                        type="button"
-                        onClick={() => setEncoder(opt.v)}
-                        className={`text-left rounded-xl border p-3.5 transition-colors
-                          ${encoder === opt.v
-                            ? 'border-accent bg-accent-soft'
-                            : 'border-line hover:border-accent-line bg-surface'}`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0
-                            ${encoder === opt.v ? 'border-accent' : 'border-line-strong'}`}>
-                            {encoder === opt.v && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
-                          </span>
-                          <span className="text-sm font-medium text-ink-hi">{opt.title}</span>
-                        </div>
-                        <p className="text-xs text-ink-lo leading-relaxed pl-5">{opt.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* ── Output format ── */}
                 <div className="field sm:col-span-2">
                   <label className="label" htmlFor="out-format">Output format</label>
