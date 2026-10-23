@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Icon } from '@iconify/react'
 import { useAuth } from '../context/auth'
 import type { Page, AnalysisResult } from '../App'
@@ -47,11 +47,15 @@ export default function Dashboard({ navigate, onOpenResult }: DashboardProps) {
   const [items, setItems] = useState<MediaItem[] | null>(null)
   const [checks, setChecks] = useState<VerificationItem[] | null>(null)
   const [tab,   setTab]   = useState<'media' | 'checks'>('media')
-  const [err,   setErr]   = useState('')
+  /** One error per tab, so a problem with one list never shows on the other. */
+  const [mediaErr,  setMediaErr]  = useState('')
+  const [checksErr, setChecksErr] = useState('')
   /** Row whose file the server no longer holds — shows an inline explanation. */
   const [goneId, setGoneId] = useState<string | null>(null)
   /** Row with a delete in flight. */
   const [busyId, setBusyId] = useState<string | null>(null)
+  /** "Clear all" on the verification history is in flight. */
+  const [clearing, setClearing] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -65,19 +69,25 @@ export default function Dashboard({ navigate, onOpenResult }: DashboardProps) {
         return r.json() as Promise<{ items: MediaItem[] }>
       })
       .then(d => { if (!cancelled) setItems(d.items) })
-      .catch(e => { if (!cancelled) setErr(e instanceof Error ? e.message : 'Failed to load') })
+      .catch(e => { if (!cancelled) setMediaErr(e instanceof Error ? e.message : 'Failed to load') })
     return () => { cancelled = true }
   }, [token])
 
-  // Verification history is a secondary panel, so a failure here is silent —
-  // it must never replace the encode list with an error.
+  // Loaded the same way as the encode list. Failing silently used to show a
+  // broken load as "No verifications yet", which reads as a real, empty history.
   useEffect(() => {
     if (!token) return
     let cancelled = false
     authedFetch(`${API_BASE}/me/verifications`)
-      .then(r => (r.ok ? (r.json() as Promise<{ items: VerificationItem[] }>) : null))
-      .then(d => { if (!cancelled) setChecks(d?.items ?? []) })
-      .catch(() => { if (!cancelled) setChecks([]) })
+      .then(async r => {
+        if (!r.ok) {
+          const text = await r.text().catch(() => '')
+          throw new Error(text || `Failed (${r.status})`)
+        }
+        return r.json() as Promise<{ items: VerificationItem[] }>
+      })
+      .then(d => { if (!cancelled) setChecks(d.items) })
+      .catch(e => { if (!cancelled) setChecksErr(e instanceof Error ? e.message : 'Failed to load') })
     return () => { cancelled = true }
   }, [token])
 
@@ -136,9 +146,40 @@ export default function Dashboard({ navigate, onOpenResult }: DashboardProps) {
       setItems(prev => (prev ? prev.filter(m => m.id !== it.id) : prev))
       if (goneId === it.id) setGoneId(null)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Could not delete that record')
+      setMediaErr(e instanceof Error ? e.message : 'Could not delete that record')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  // History rows are summaries of past reports and nothing else reads them, so
+  // unlike deleting an encode record this has no consequences worth warning
+  // about beyond the row itself being gone.
+  const deleteCheck = async (c: VerificationItem) => {
+    if (!confirm(`Remove the check of "${c.file_name || 'this file'}" from your history?`)) return
+    setBusyId(c.id)
+    try {
+      const res = await authedFetch(`${API_BASE}/me/verifications/${c.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
+      setChecks(prev => (prev ? prev.filter(x => x.id !== c.id) : prev))
+    } catch (e) {
+      setChecksErr(e instanceof Error ? e.message : 'Could not delete that check')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const clearChecks = async () => {
+    if (!confirm('Clear your entire verification history? This cannot be undone.')) return
+    setClearing(true)
+    try {
+      const res = await authedFetch(`${API_BASE}/me/verifications`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`))
+      setChecks([])
+    } catch (e) {
+      setChecksErr(e instanceof Error ? e.message : 'Could not clear your history')
+    } finally {
+      setClearing(false)
     }
   }
 
@@ -208,9 +249,17 @@ export default function Dashboard({ navigate, onOpenResult }: DashboardProps) {
           )}
         </div>
         <div className="flex gap-2.5 flex-wrap shrink-0">
-          <button onClick={() => navigate('encode')} className="btn-primary">
-            <Icon icon="lucide:plus" width="16" /> Encode new
-          </button>
+          {/* The primary action follows the tab, so each list offers the
+              action that adds to it. */}
+          {tab === 'media' ? (
+            <button onClick={() => navigate('encode')} className="btn-primary">
+              <Icon icon="lucide:plus" width="16" /> Encode new
+            </button>
+          ) : (
+            <button onClick={() => navigate('verify')} className="btn-primary">
+              <Icon icon="lucide:scan" width="16" /> Verify a file
+            </button>
+          )}
           <button onClick={() => { logout(); navigate('home') }} className="btn-ghost">
             <Icon icon="lucide:log-out" width="16" /> Sign out
           </button>
@@ -252,105 +301,95 @@ export default function Dashboard({ navigate, onOpenResult }: DashboardProps) {
         })}
       </div>
 
-      {err && (
-        <div className="callout-alert mb-8">
-          <Icon icon="lucide:alert-circle" width="15" className="text-alert shrink-0 mt-0.5" /> {err}
-        </div>
-      )}
+      {/* ── Encoded media ── */}
+      {tab === 'media' && (
+        <>
+          {mediaErr && <ErrorCallout message={mediaErr} />}
+          {items === null && !mediaErr && <Loading />}
 
-      {tab === 'media' && items === null && !err && (
-        <div className="card p-16 flex items-center justify-center gap-3 text-base text-ink-lo">
-          <Icon icon="lucide:loader-2" width="18" className="animate-spin" /> Loading...
-        </div>
-      )}
+          {items && items.length === 0 && (
+            <EmptyState
+              icon="lucide:image-off"
+              title="No encoded media yet"
+              body="Encode your first file to see it here."
+              cta="Go to encode"
+              onCta={() => navigate('encode')}
+            />
+          )}
 
-      {tab === 'media' && items && items.length === 0 && (
-        <div className="card p-16 text-center">
-          <span className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-line text-ink-faint
-                           flex items-center justify-center mx-auto mb-5">
-            <Icon icon="lucide:image-off" width="26" />
-          </span>
-          <h2 className="font-display text-xl text-ink-hi mb-2">No encoded media yet</h2>
-          <p className="text-base text-ink-lo mb-6">Encode your first file to see it here.</p>
-          <button onClick={() => navigate('encode')} className="btn-primary">
-            Go to encode <Icon icon="lucide:arrow-right" width="16" />
-          </button>
-        </div>
-      )}
-
-      {tab === 'media' && items && items.length > 0 && (
-        <ul className="flex flex-col gap-3">
-          {items.map(it => {
-            const psnrRaw = (it.metadata as { psnr_db?: unknown; psnr_y_mean_db?: unknown })?.psnr_db
-                         ?? (it.metadata as { psnr_y_mean_db?: unknown })?.psnr_y_mean_db
-            const psnr = typeof psnrRaw === 'number' ? psnrRaw.toFixed(1) : null
-            return (
-              <li key={it.id} className="card-lift p-5 flex flex-col gap-4">
-                {/* Inline, not an alert(): the file being absent is the normal
-                    state after the server restarts, so it warrants an
-                    explanation attached to the row rather than a popup. */}
-                {goneId === it.id && (
-                  <div className="callout-warn text-sm">
-                    <Icon icon="lucide:info" width="15" className="shrink-0 mt-0.5" />
-                    <span>
-                      This file isn't kept on the server — use the copy you downloaded when
-                      encoding. Encoding is deterministic, so re-encoding the same original
-                      under the same media ID reproduces an identical file; delete this
-                      record first to free the ID.
-                    </span>
-                  </div>
-                )}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-                <div className="flex items-start gap-4 min-w-0">
-                  <span className="w-11 h-11 rounded-xl bg-white/[0.04] border border-line text-ink-lo
-                                   flex items-center justify-center shrink-0">
-                    <Icon icon={it.kind === 'video' ? 'lucide:video' : 'lucide:image'} width="20" />
-                  </span>
-                  <div className="min-w-0">
-                    {/* Headline is the filename — what the user recognises.
-                        The media id is the identifier the watermark actually
-                        carries, so it stays visible, just demoted. Rows encoded
-                        before migration 005 have no filename and fall back to
-                        leading with the media id rather than inventing one. */}
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <p className="text-base font-medium text-ink-hi break-all">
-                        {it.file_name || it.media || '— no media id —'}
-                      </p>
-                      <span className="badge-neutral">{it.kind}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-lo mb-1">
-                      {it.file_name && it.media && (
-                        <span>Media ID <span className="font-mono text-ink-hi">{it.media}</span></span>
+          {items && items.length > 0 && (
+            <section>
+              <ListHeading>Files you have watermarked, newest first</ListHeading>
+              <ul className="flex flex-col gap-3">
+                {items.map(it => {
+                  const psnrRaw = (it.metadata as { psnr_db?: unknown; psnr_y_mean_db?: unknown })?.psnr_db
+                               ?? (it.metadata as { psnr_y_mean_db?: unknown })?.psnr_y_mean_db
+                  const psnr = typeof psnrRaw === 'number' ? psnrRaw.toFixed(1) : null
+                  return (
+                    <li key={it.id} className="card-lift p-5 flex flex-col gap-4">
+                      {/* Inline, not an alert(): the file being absent is the normal
+                          state after the server restarts, so it warrants an
+                          explanation attached to the row rather than a popup. */}
+                      {goneId === it.id && (
+                        <div className="callout-warn text-sm">
+                          <Icon icon="lucide:info" width="15" className="shrink-0 mt-0.5" />
+                          <span>
+                            This file isn't kept on the server — use the copy you downloaded when
+                            encoding. Encoding is deterministic, so re-encoding the same original
+                            under the same media ID reproduces an identical file; delete this
+                            record first to free the ID.
+                          </span>
+                        </div>
                       )}
-                      {psnr && <span>PSNR <span className="font-mono text-ink-hi">{psnr} dB</span></span>}
-                      {it.created_at && (
-                        <span>Encoded <span className="text-ink-hi">{new Date(it.created_at).toLocaleString()}</span></span>
-                      )}
-                    </div>
-                    <p className="meta break-all">{it.id}</p>
-                  </div>
-                </div>
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+                        <div className="flex items-start gap-4 min-w-0">
+                          <span className="w-11 h-11 rounded-xl bg-white/[0.04] border border-line text-ink-lo
+                                           flex items-center justify-center shrink-0">
+                            <Icon icon={it.kind === 'video' ? 'lucide:video' : 'lucide:image'} width="20" />
+                          </span>
+                          <div className="min-w-0">
+                            {/* Headline is the filename — what the user recognises.
+                                The media id is the identifier the watermark actually
+                                carries, so it stays visible, just demoted. Rows encoded
+                                before migration 005 have no filename and fall back to
+                                leading with the media id rather than inventing one. */}
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <p className="text-base font-medium text-ink-hi break-all">
+                                {it.file_name || it.media || '— no media id —'}
+                              </p>
+                              <span className="badge-neutral">{it.kind}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-lo mb-1">
+                              {it.file_name && it.media && (
+                                <span>Media ID <span className="font-mono text-ink-hi">{it.media}</span></span>
+                              )}
+                              {psnr && <span>PSNR <span className="font-mono text-ink-hi">{psnr} dB</span></span>}
+                              {it.created_at && (
+                                <span>Encoded <span className="text-ink-hi">{new Date(it.created_at).toLocaleString()}</span></span>
+                              )}
+                            </div>
+                            <p className="meta break-all">{it.id}</p>
+                          </div>
+                        </div>
 
-                <div className="flex flex-wrap gap-2 shrink-0">
-                  <button onClick={() => downloadMeta(it)} className="btn-outline btn-sm">
-                    <Icon icon="lucide:file-json" width="14" /> metadata.json
-                  </button>
-                  <button onClick={() => downloadFile(it)} className="btn-ghost btn-sm">
-                    <Icon icon="lucide:download" width="14" /> File
-                  </button>
-                  <button onClick={() => deleteMedia(it)} disabled={busyId === it.id}
-                          className="btn-ghost btn-sm text-alert"
-                          title="Delete this record and free its media ID">
-                    <Icon icon={busyId === it.id ? 'lucide:loader-2' : 'lucide:trash-2'} width="14"
-                          className={busyId === it.id ? 'animate-spin' : ''} />
-                    Delete
-                  </button>
-                </div>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+                        <div className="flex flex-wrap gap-2 shrink-0">
+                          <button onClick={() => downloadMeta(it)} className="btn-outline btn-sm">
+                            <Icon icon="lucide:file-json" width="14" /> metadata.json
+                          </button>
+                          <button onClick={() => downloadFile(it)} className="btn-ghost btn-sm">
+                            <Icon icon="lucide:download" width="14" /> File
+                          </button>
+                          <DeleteButton busy={busyId === it.id} onClick={() => deleteMedia(it)}
+                                        title="Delete this record and free its media ID" />
+                        </div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          )}
+        </>
       )}
 
       {/* ── Verification history ──
@@ -358,103 +397,170 @@ export default function Dashboard({ navigate, onOpenResult }: DashboardProps) {
           For the use cases this targets — insurance photos, medical imaging,
           bodycam footage — the audit trail is arguably the point. Only a
           summary is stored, never the report: full results carry base64
-          watermark comparisons, two per frame for video. */}
-      {tab === 'checks' && checks === null && (
-        <div className="card p-16 flex items-center justify-center gap-3 text-base text-ink-lo">
-          <Icon icon="lucide:loader-2" width="18" className="animate-spin" /> Loading...
-        </div>
-      )}
+          watermark comparisons, two per frame for video.
 
-      {tab === 'checks' && checks && (
-        <section>
-          <p className="text-sm text-ink-lo mb-5">Integrity checks you have run, newest first</p>
+          Laid out like the encode list on purpose: same row, same badges, same
+          labelled actions on the right, so the two tabs read as one page. */}
+      {tab === 'checks' && (
+        <>
+          {checksErr && <ErrorCallout message={checksErr} />}
+          {checks === null && !checksErr && <Loading />}
 
-          {checks.length === 0 && (
-            <div className="card p-10 text-center">
-              <span className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-line text-ink-faint
-                               flex items-center justify-center mx-auto mb-4">
-                <Icon icon="lucide:file-search" width="22" />
-              </span>
-              <p className="text-base text-ink-hi mb-1.5">No verifications yet</p>
-              <p className="text-sm text-ink-lo mb-5">
-                Checks you run while signed in are recorded here.
-              </p>
-              <button onClick={() => navigate('verify')} className="btn-outline btn-sm">
-                <Icon icon="lucide:scan" width="14" /> Verify a file
-              </button>
-            </div>
+          {checks && checks.length === 0 && (
+            <EmptyState
+              icon="lucide:file-search"
+              title="No verifications yet"
+              body="Checks you run while signed in are recorded here."
+              cta="Go to verify"
+              onCta={() => navigate('verify')}
+            />
           )}
 
-          <ul className="flex flex-col gap-3">
-            {checks.map(c => {
-              const tampered = c.status === 'tampered'
-              return (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => openCheck(c)}
-                    className="card-lift w-full text-left p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer"
-                    aria-label={`Open the ${c.status} report for ${c.file_name ?? 'this file'}`}
-                  >
-                  <div className="flex items-start gap-4 min-w-0">
-                    <span className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0
-                      ${tampered ? 'border-alert-line text-alert bg-alert-soft'
-                                 : 'border-ok-line text-ok bg-ok-soft'}`}>
-                      <Icon icon={tampered ? 'lucide:shield-alert' : 'lucide:shield-check'} width="20" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <p className="text-base font-medium text-ink-hi break-all">
-                          {c.file_name || '— unnamed file —'}
-                        </p>
-                        <span className={tampered ? 'badge-alert' : 'badge-ok'}>
-                          {tampered ? 'Tampered' : 'Authentic'}
+          {checks && checks.length > 0 && (
+            <section>
+              {/* Clear all exists here and not on the encode list: a history row
+                  is only a summary, while deleting encode records in bulk would
+                  make every shared copy unrecognisable to lookup. */}
+              <ListHeading action={
+                <button onClick={clearChecks} disabled={clearing}
+                        className="btn-ghost btn-sm text-alert shrink-0">
+                  <Icon icon={clearing ? 'lucide:loader-2' : 'lucide:trash-2'} width="14"
+                        className={clearing ? 'animate-spin' : ''} />
+                  Clear all
+                </button>
+              }>
+                Integrity checks you have run, newest first
+              </ListHeading>
+
+              <ul className="flex flex-col gap-3">
+                {checks.map(c => {
+                  const tampered = c.status === 'tampered'
+                  return (
+                    <li key={c.id}
+                        className="card-lift p-5 flex flex-col md:flex-row md:items-center justify-between gap-5">
+                      <div className="flex items-start gap-4 min-w-0">
+                        <span className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0
+                          ${tampered ? 'border-alert-line text-alert bg-alert-soft'
+                                     : 'border-ok-line text-ok bg-ok-soft'}`}>
+                          <Icon icon={tampered ? 'lucide:shield-alert' : 'lucide:shield-check'} width="20" />
                         </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <p className="text-base font-medium text-ink-hi break-all">
+                              {c.file_name || '— unnamed file —'}
+                            </p>
+                            <span className={tampered ? 'badge-alert' : 'badge-ok'}>
+                              {tampered ? 'Tampered' : 'Authentic'}
+                            </span>
+                            {c.kind && <span className="badge-neutral">{c.kind}</span>}
+                          </div>
+
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-lo mb-1">
+                            {c.claimed_media && (
+                              <span>Media ID <span className="font-mono text-ink-hi">{c.claimed_media}</span></span>
+                            )}
+                            {typeof c.ber === 'number' && (
+                              <span>BER <span className="font-mono text-ink-hi">{c.ber.toFixed(4)}</span></span>
+                            )}
+                            {typeof c.blocks_total === 'number' && c.blocks_total > 0 && (
+                              <span>Blocks <span className="font-mono text-ink-hi">{c.blocks_tampered}/{c.blocks_total}</span></span>
+                            )}
+                            {c.created_at && (
+                              <span>Checked <span className="text-ink-hi">{new Date(c.created_at).toLocaleString()}</span></span>
+                            )}
+                            {/* Deliberately NOT "matched encode". This resolves the
+                                metadata that was SUPPLIED for the check, not anything
+                                recovered from the pixels — so it stays true on a file
+                                that failed verification outright. Wording it as a match
+                                contradicted the reasons listed right beside it. */}
+                            {c.watermark_id && (
+                              <span className="inline-flex items-center gap-1"
+                                    title="The metadata used for this check belongs to one of your encode records. It does not mean the file passed.">
+                                <Icon icon="lucide:link" width="11" /> From your encodes
+                              </span>
+                            )}
+                          </div>
+
+                          {/* The reason, not a score — same rationale as Results. */}
+                          {tampered && (c.reasons?.length ?? 0) > 0 && (
+                            <p className="text-sm text-ink-lo">{c.reasons!.join(' · ')}</p>
+                          )}
+                        </div>
                       </div>
 
-                      {/* The reason, not a score — same rationale as Results. */}
-                      {tampered && (c.reasons?.length ?? 0) > 0 && (
-                        <p className="text-sm text-ink-lo mb-1">{c.reasons!.join(' · ')}</p>
-                      )}
-
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-lo">
-                        {c.claimed_media && (
-                          <span>Media <span className="font-mono text-ink-hi">{c.claimed_media}</span></span>
-                        )}
-                        {typeof c.ber === 'number' && (
-                          <span>BER <span className="font-mono text-ink-hi">{c.ber.toFixed(4)}</span></span>
-                        )}
-                        {typeof c.blocks_total === 'number' && c.blocks_total > 0 && (
-                          <span>Blocks <span className="font-mono text-ink-hi">{c.blocks_tampered}/{c.blocks_total}</span></span>
-                        )}
-                        {c.created_at && (
-                          <span>Checked <span className="text-ink-hi">{new Date(c.created_at).toLocaleString()}</span></span>
-                        )}
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <button onClick={() => openCheck(c)} className="btn-outline btn-sm"
+                                aria-label={`Open the ${c.status} report for ${c.file_name ?? 'this file'}`}>
+                          <Icon icon="lucide:file-text" width="14" /> Report
+                        </button>
+                        <DeleteButton busy={busyId === c.id} onClick={() => deleteCheck(c)}
+                                      title="Remove this check from your history" />
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Deliberately NOT "matched encode". This resolves the
-                      metadata that was SUPPLIED for the check, not anything
-                      recovered from the pixels — so it stays true on a file
-                      that failed verification outright. Wording it as a match
-                      contradicted the reasons listed right beside it. */}
-                  <div className="flex items-center gap-3 shrink-0">
-                    {c.watermark_id && (
-                      <span className="badge-neutral"
-                            title="The metadata used for this check belongs to one of your encode records. It does not mean the file passed.">
-                        <Icon icon="lucide:link" width="12" /> from your encodes
-                      </span>
-                    )}
-                    <Icon icon="lucide:chevron-right" width="18" className="text-ink-faint" />
-                  </div>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          )}
+        </>
       )}
     </div>
+  )
+}
+
+// ── Shared pieces, so both tabs are built from the same parts ──
+
+function Loading() {
+  return (
+    <div className="card p-16 flex items-center justify-center gap-3 text-base text-ink-lo">
+      <Icon icon="lucide:loader-2" width="18" className="animate-spin" /> Loading...
+    </div>
+  )
+}
+
+function ErrorCallout({ message }: { message: string }) {
+  return (
+    <div className="callout-alert mb-8">
+      <Icon icon="lucide:alert-circle" width="15" className="text-alert shrink-0 mt-0.5" /> {message}
+    </div>
+  )
+}
+
+function EmptyState({ icon, title, body, cta, onCta }: {
+  icon: string; title: string; body: string; cta: string; onCta: () => void
+}) {
+  return (
+    <div className="card p-16 text-center">
+      <span className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-line text-ink-faint
+                       flex items-center justify-center mx-auto mb-5">
+        <Icon icon={icon} width="26" />
+      </span>
+      <h2 className="font-display text-xl text-ink-hi mb-2">{title}</h2>
+      <p className="text-base text-ink-lo mb-6">{body}</p>
+      <button onClick={onCta} className="btn-primary">
+        {cta} <Icon icon="lucide:arrow-right" width="16" />
+      </button>
+    </div>
+  )
+}
+
+/** Caption above a list. Held to one height so both lists start at the same
+ *  place whether or not the row carries an action. */
+function ListHeading({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 mb-5 min-h-9">
+      <p className="text-sm text-ink-lo">{children}</p>
+      {action}
+    </div>
+  )
+}
+
+function DeleteButton({ busy, onClick, title }: { busy: boolean; onClick: () => void; title: string }) {
+  return (
+    <button onClick={onClick} disabled={busy} className="btn-ghost btn-sm text-alert" title={title}>
+      <Icon icon={busy ? 'lucide:loader-2' : 'lucide:trash-2'} width="14"
+            className={busy ? 'animate-spin' : ''} />
+      Delete
+    </button>
   )
 }
