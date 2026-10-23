@@ -59,10 +59,10 @@ export default function Footer({ navigate }: FooterProps) {
 
       <div className="page border-t border-line py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
         <p className="text-xs text-ink-faint">
-          Graduation project · LWT + DCT + SVD + QIM · BCH(15,7)
+          Graduation project · LWT + SVD + QIM · BCH(15,7)
         </p>
         <p className="text-xs text-ink-faint font-mono">
-          Lossless output only — PNG / MKV FFV1
+          Lossless output only · PNG / WEBP / MKV / AVI
         </p>
       </div>
     </footer>

@@ -22,7 +22,7 @@ const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 const VERIFY_STEPS = [
   'Reading watermarked file...',
-  'Applying LWT + 8x8 DCT + SVD...',
+  'Applying LWT + 8x8 SVD...',
   'Extracting bits via QIM detector...',
   'Decoding BCH(15,7) + majority vote...',
   'Matching owner / media / frame IDs...',
@@ -638,7 +638,7 @@ export default function Verify({ onComplete }: VerifyProps) {
               <p className="text-base text-ink-lo mb-6">Upload a watermarked file to run analysis</p>
 
               <div className="flex gap-1.5 justify-center flex-wrap mb-4">
-                {['JPG','PNG','MP4','AVI','MOV'].map(t => (
+                {['JPG','PNG','WEBP','MP4','MOV','AVI','MKV','WEBM'].map(t => (
                   <span key={t} className="badge-neutral">{t}</span>
                 ))}
               </div>

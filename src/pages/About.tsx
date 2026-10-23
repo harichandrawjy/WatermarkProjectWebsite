@@ -8,7 +8,7 @@ const TEAM = [
 ]
 
 const TECH = [
-  { cat: 'Watermarking',      items: ['LWT', 'DCT', 'SVD', 'QIM', 'BCH(15,7)', 'SHA-256'] },
+  { cat: 'Watermarking',      items: ['LWT', 'SVD', 'QIM', 'BCH(15,7)', 'SHA-256'] },
   { cat: 'Signal Processing', items: ['NumPy', 'OpenCV', 'PyWavelets', 'SciPy', 'galois', 'FFmpeg'] },
   { cat: 'Backend / API',     items: ['FastAPI', 'Python', 'Supabase', 'REST API', 'JSON'] },
   { cat: 'Frontend',          items: ['React', 'TypeScript', 'Vite', 'Tailwind CSS'] },
@@ -32,12 +32,12 @@ const METHOD = [
   {
     step: '01',
     title: 'Watermark embedding',
-    body: 'The Y (luminance) channel is decomposed by a 2-level Lifting Wavelet Transform; the LLLL sub-band is divided into 8×8 blocks, each transformed by DCT then SVD. The BCH(15,7)-coded payload bits — owner / media / frame / chain IDs — are embedded by Quantization Index Modulation on the largest singular value S₀, then the inverse transforms reconstruct the watermarked frame.',
+    body: 'The Y (luminance) channel is decomposed by a 2-level Lifting Wavelet Transform; the LLLL sub-band is divided into 8×8 blocks, each decomposed by SVD. The BCH(15,7)-coded payload bits — owner / media / frame / chain IDs — are embedded by Quantization Index Modulation on the largest singular value S₀, then the inverse transforms reconstruct the watermarked frame.',
   },
   {
     step: '02',
     title: 'Integrity verification',
-    body: 'Verification re-runs the LWT → 8×8 DCT → SVD chain on the Y channel, extracts payload bits via a QIM detector, and decodes them with BCH(15,7) + majority vote. The recovered owner / media / frame / chain IDs are matched against the stored record to confirm ownership and detect temporal anomalies (deleted, duplicated, or reordered frames).',
+    body: 'Verification re-runs the LWT → 8×8 SVD chain on the Y channel, extracts payload bits via a QIM detector, and decodes them with BCH(15,7) + majority vote. The recovered owner / media / frame / chain IDs are matched against the stored record to confirm ownership and detect temporal anomalies (deleted, duplicated, or reordered frames).',
   },
   {
     step: '03',
@@ -48,7 +48,7 @@ const METHOD = [
 
 const FLOW = [
   { label: 'Original media',     icon: 'lucide:image',        active: false },
-  { label: 'LWT + DCT + SVD',    icon: 'lucide:cpu',          active: true  },
+  { label: 'LWT + SVD',          icon: 'lucide:cpu',          active: true  },
   { label: 'Protected media',    icon: 'lucide:shield-check', active: false },
   { label: 'QIM detector + BCH', icon: 'lucide:microscope',   active: true  },
   { label: 'Tamper result',      icon: 'lucide:file-check-2', active: false },
@@ -75,7 +75,7 @@ export default function About() {
         </h1>
         <p className="page-lead">
           Multimedia tamper detection using invisible semi-fragile watermarking with
-          LWT + DCT + SVD payload encoding and per-sub-block parity localization.
+          LWT + SVD payload encoding and per-sub-block parity localization.
         </p>
       </header>
 

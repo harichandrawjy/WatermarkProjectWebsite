@@ -13,14 +13,16 @@ const USE_CASES = [
 ]
 
 const STATS = [
-  { val: '29–31', unit: 'dB', label: 'PSNR quality' },
-  { val: '62',    unit: '%',  label: 'WM accuracy'  },
-  { val: '2',     unit: '',   label: 'Media types'  },
+  // Measured by eval/robustness_eval.py: mean PSNR over the 10 test images,
+  // and edits caught out of the 30 edited copies.
+  { val: '41.6',  unit: 'dB', label: 'Average PSNR'   },
+  { val: '29/30', unit: '',   label: 'Edits detected' },
+  { val: '2',     unit: '',   label: 'Media types'    },
 ]
 
 const PIPELINE = [
   { n: '01', title: 'Upload original',  desc: 'Clean, unmodified media' },
-  { n: '02', title: 'Embed watermark',  desc: 'LWT + DCT + SVD with QIM' },
+  { n: '02', title: 'Embed watermark',  desc: 'LWT + SVD with QIM' },
   { n: '03', title: 'Detect tampering', desc: 'QIM detector + BCH(15,7) decode' },
   { n: '04', title: 'Localize changes', desc: 'Per-sub-block SHA-256 parity check' },
 ]
@@ -101,7 +103,7 @@ export default function Home({ navigate }: HomeProps) {
                 <div className="absolute top-[22%] left-[20%] w-28 h-28 rounded-lg border border-alert bg-alert/10 shadow-glow-alert">
                   <span className="absolute -top-6 left-0 text-2xs font-mono font-medium text-alert
                                    bg-canvas/90 border border-alert-line px-2 py-0.5 rounded whitespace-nowrap">
-                    face_swap
+                    tampered
                   </span>
                   <span className="absolute -top-px -left-px w-2 h-2 border-t border-l border-alert" />
                   <span className="absolute -bottom-px -right-px w-2 h-2 border-b border-r border-alert" />
@@ -120,8 +122,8 @@ export default function Home({ navigate }: HomeProps) {
               {/* Readout */}
               <div className="absolute bottom-3 right-3 bg-canvas/90 backdrop-blur border border-line rounded-lg px-3 py-2.5 font-mono text-2xs leading-relaxed">
                 <div className="text-accent mb-1">status: analyzing</div>
-                <div className="text-ink-lo">psnr <span className="text-ink-hi">29.5 dB</span></div>
-                <div className="text-ink-lo">confidence <span className="text-alert">94.3%</span></div>
+                <div className="text-ink-lo">psnr <span className="text-ink-hi">41.6 dB</span></div>
+                <div className="text-ink-lo">verdict <span className="text-alert">tampered</span></div>
               </div>
             </div>
           </div>
@@ -140,8 +142,8 @@ export default function Home({ navigate }: HomeProps) {
             {[
               {
                 step: 'Step 1', title: 'Encode watermark', icon: 'lucide:layers', page: 'encode' as Page,
-                desc: "Upload your original image or video. We embed an invisible semi-fragile watermark using a LWT + DCT + SVD + QIM pipeline. Download the protected file and share it freely.",
-                points: ['Invisible to the human eye', 'Survives normal compression', 'PSNR quality above 28 dB'],
+                desc: "Upload your original image or video. We embed an invisible semi-fragile watermark using a LWT + SVD + QIM pipeline. Download the protected file and share it freely.",
+                points: ['Invisible to the human eye', 'Survives normal compression', 'Average PSNR of 41.6 dB'],
               },
               {
                 step: 'Step 2', title: 'Verify integrity', icon: 'lucide:scan-search', page: 'verify' as Page,

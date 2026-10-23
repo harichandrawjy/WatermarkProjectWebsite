@@ -20,7 +20,7 @@ const ENCODE_STEPS = [
   'Reading media file...',
   'Building BCH(15,7) payload...',
   'Applying 2-level LWT to Y channel...',
-  'Running 8x8 block DCT + SVD...',
+  'Running 8x8 block SVD...',
   'Embedding bits via QIM on S₀...',
   'Embedding SHA-256 parity in Cb LSBs...',
   'Finalizing watermarked output...',
@@ -28,9 +28,9 @@ const ENCODE_STEPS = [
 
 const SIDEBAR_FACTS = [
   { icon: 'lucide:eye-off',        text: 'Watermark is mathematically invisible to the human eye.' },
-  { icon: 'lucide:file-archive',   text: 'Survives normal compression, resizing, and web sharing.' },
+  { icon: 'lucide:file-archive',   text: 'Survives PNG re-saves and moderate JPEG compression (q80 and above).' },
   { icon: 'lucide:alert-triangle', text: 'Fractures when pixels are maliciously altered or deepfaked.' },
-  { icon: 'lucide:bar-chart-2',    text: 'Maintains PSNR visual quality securely above 28 dB.' },
+  { icon: 'lucide:bar-chart-2',    text: 'Averages 41.6 dB PSNR across our test images.' },
 ]
 
 const USE_CASES = [
@@ -262,7 +262,7 @@ export default function Encode({ navigate }: EncodeProps) {
       <ol className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5 pb-12 mb-12 border-b border-line">
         {[
           { n: '01', title: 'Upload original', desc: 'Your clean, unmodified media' },
-          { n: '02', title: 'Embed watermark', desc: 'LWT + DCT + SVD with QIM payload' },
+          { n: '02', title: 'Embed watermark', desc: 'LWT + SVD with QIM payload' },
           { n: '03', title: 'Download secure', desc: 'Use or share the protected file' },
         ].map(s => (
           <li key={s.n} className="flex items-start gap-3.5">
@@ -590,7 +590,7 @@ export default function Encode({ navigate }: EncodeProps) {
               <p className="text-base text-ink-lo mb-6">Upload a clean file to begin the encoding process</p>
 
               <div className="flex gap-1.5 justify-center flex-wrap mb-4">
-                {['JPG','PNG','MP4','AVI','MOV'].map(t => (
+                {['JPG','PNG','WEBP','MP4','MOV','AVI','MKV','WEBM'].map(t => (
                   <span key={t} className="badge-neutral">{t}</span>
                 ))}
               </div>
