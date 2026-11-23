@@ -134,7 +134,7 @@ export default function Results({ result, navigate }: ResultsProps) {
 
   const { status, wmAccuracy, ber, reasons, ownerExpected, archived, checkedAt, blocksTampered,
           tamperedRegions, frameResults, fileName, fileType, imageWidth, imageHeight,
-          watermarkFound, ownerMatch, mediaMatch, ownerId, mediaId, ownerLabel, mediaLabel,
+          watermarkFound, resynced, ownerMatch, mediaMatch, ownerId, mediaId, ownerLabel, mediaLabel,
           watermarkOriginal, watermarkExtracted, watermarkMask, watermarkClusters, sourcePreview,
           missingFrames, reordered, duplicateFrames, framesTruncated } = result
   const tampered = status === 'tampered'
@@ -143,6 +143,10 @@ export default function Results({ result, navigate }: ResultsProps) {
   // was actually recovered from the pixels — NOT from the supplied metadata,
   // which is present whether or not the file contains a watermark.
   const wmFound = watermarkFound ?? (wmAccuracy >= 0.5 || Boolean(ownerId || mediaId))
+  // A resized copy (a photo shrunk by a messaging app, say) can have its grid
+  // located but its ids too damaged to read. That is a protected file, not an
+  // unprotected one, and the identity section must not suggest otherwise.
+  const wmLocated = !wmFound && Boolean(resynced)
 
   // For video, the spatial heatmap reflects whichever frame is selected;
   // image results use the single top-level tamperedRegions array.
@@ -197,8 +201,12 @@ export default function Results({ result, navigate }: ResultsProps) {
           New analysis
         </button>
 
+        {/* The title takes the free width and the verdict card is capped, so a
+            long reason wraps inside the card. With the card `shrink-0` instead,
+            a one-line reason widened it until the title column had no width
+            left and "Analysis report" spilled over the card. */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-          <div className="min-w-0">
+          <div className="min-w-0 lg:flex-1">
             <h1 className="page-title mb-4">Analysis report</h1>
             <p className="meta flex items-center gap-2 min-w-0">
               <Icon icon="lucide:file-terminal" width="15" className="text-ink-faint shrink-0" />
@@ -207,7 +215,7 @@ export default function Results({ result, navigate }: ResultsProps) {
           </div>
 
           {/* The one element on the page that earns a glow. */}
-          <div className={`flex items-center gap-5 px-7 py-5 rounded-2xl border shrink-0
+          <div className={`flex items-center gap-5 px-7 py-5 rounded-2xl border lg:max-w-xl
             ${tampered
               ? 'bg-alert-soft border-alert-line shadow-glow-alert'
               : 'bg-ok-soft border-ok-line shadow-glow-ok'}`}>
@@ -305,17 +313,22 @@ export default function Results({ result, navigate }: ResultsProps) {
       <section className="mb-14">
         <SectionHead
           icon="lucide:fingerprint"
-          tone={wmFound ? 'text-accent' : 'text-alert'}
+          tone={wmFound ? 'text-accent' : wmLocated ? 'text-warn' : 'text-alert'}
           title="Watermark identity"
           sub={wmFound
             ? 'Embedded ownership signature recovered from the media'
-            : 'No recoverable watermark signature was found in this file'}
+            : wmLocated
+              ? 'A watermark was found, but it is too damaged to read the IDs'
+              : 'No recoverable watermark signature was found in this file'}
         />
 
-        <div className={`card p-6 ${wmFound ? '' : 'border-alert-line'}`}>
-          <span className={`${wmFound ? 'pill-ok' : 'pill-alert'} mb-5`}>
-            <Icon icon={wmFound ? 'lucide:check-circle-2' : 'lucide:x-circle'} width="13" />
-            {wmFound ? 'Media ID and owner ID found' : 'Media ID and owner ID not found'}
+        <div className={`card p-6 ${wmFound ? '' : wmLocated ? 'border-warn-line' : 'border-alert-line'}`}>
+          <span className={`${wmFound ? 'pill-ok' : wmLocated ? 'pill-warn' : 'pill-alert'} mb-5`}>
+            <Icon icon={wmFound ? 'lucide:check-circle-2' : wmLocated ? 'lucide:alert-circle' : 'lucide:x-circle'}
+                  width="13" />
+            {wmFound
+              ? 'Media ID and owner ID found'
+              : wmLocated ? 'Watermark found, IDs unreadable' : 'Media ID and owner ID not found'}
           </span>
 
           {wmFound ? (
@@ -352,6 +365,16 @@ export default function Results({ result, navigate }: ResultsProps) {
                                  label={f.subLabel} />
                 </div>
               ))}
+            </div>
+          ) : wmLocated ? (
+            <div className="callout-warn">
+              <Icon icon="lucide:alert-triangle" className="text-warn shrink-0 mt-0.5" width="16" />
+              <p>
+                The watermark was found after restoring this copy's original size, so the file
+                was protected with our Encode pipeline. Resizing and re-encoding then damaged too
+                many bits to read the owner and media IDs exactly. Verify the original file, or a
+                copy that was shared uncompressed (for example, sent as a document).
+              </p>
             </div>
           ) : (
             <div className="callout-alert">

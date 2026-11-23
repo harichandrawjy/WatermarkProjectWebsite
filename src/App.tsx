@@ -53,6 +53,10 @@ export interface AnalysisResult {
   fileName: string
   fileType: 'image' | 'video'
   watermarkFound?: boolean
+  /** Set when the copy's size or crop had to be restored before it could be
+   *  read. The backend only accepts a geometry the expected ids agree with, so
+   *  this also means the watermark was located even if the ids then failed. */
+  resynced?: { width: number; height: number; offsetX: number; offsetY: number } | null
   ownerMatch?: boolean
   mediaMatch?: boolean
   // Recovered: the raw strings actually extracted from the watermark. Present

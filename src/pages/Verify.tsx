@@ -279,6 +279,7 @@ export default function Verify({ onComplete }: VerifyProps) {
         fileName: raw.fileName ?? file.name,
         fileType: raw.fileType ?? (file.type.startsWith('video/') ? 'video' : 'image'),
         watermarkFound: raw.watermarkFound,
+        resynced: raw.resynced,
         ownerMatch: raw.ownerMatch,
         mediaMatch: raw.mediaMatch,
         framesChecked: raw.framesChecked,
