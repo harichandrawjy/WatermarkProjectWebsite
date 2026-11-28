@@ -1,7 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Icon } from '@iconify/react'
 import { useAuth } from '../context/auth'
-import type { Page, AnalysisResult } from '../App'
+import type { Page, AnalysisResult, Verdict } from '../App'
+
+/** History badges per verdict; amber `unverifiable` = ids unreadable, no edit found. */
+const CHECK_STYLE: Record<Verdict, { label: string; badge: string; tile: string; icon: string }> = {
+  authentic:    { label: 'Authentic',    badge: 'badge-ok',    tile: 'border-ok-line text-ok bg-ok-soft',          icon: 'lucide:shield-check' },
+  tampered:     { label: 'Tampered',     badge: 'badge-alert', tile: 'border-alert-line text-alert bg-alert-soft', icon: 'lucide:shield-alert' },
+  unverifiable: { label: "Can't verify", badge: 'badge-warn',  tile: 'border-warn-line text-warn bg-warn-soft',    icon: 'lucide:shield-question' },
+}
 
 interface DashboardProps {
   navigate: (p: Page) => void
@@ -27,7 +34,7 @@ interface VerificationItem {
   id:               string
   file_name:        string | null
   kind:             'image' | 'video' | null
-  status:           'authentic' | 'tampered'
+  status:           Verdict
   reasons:          string[] | null
   ber:              number | null
   wm_accuracy:      number | null
@@ -434,24 +441,20 @@ export default function Dashboard({ navigate, onOpenResult }: DashboardProps) {
 
               <ul className="flex flex-col gap-3">
                 {checks.map(c => {
-                  const tampered = c.status === 'tampered'
+                  const S = CHECK_STYLE[c.status] ?? CHECK_STYLE.tampered
                   return (
                     <li key={c.id}
                         className="card-lift p-5 flex flex-col md:flex-row md:items-center justify-between gap-5">
                       <div className="flex items-start gap-4 min-w-0">
-                        <span className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0
-                          ${tampered ? 'border-alert-line text-alert bg-alert-soft'
-                                     : 'border-ok-line text-ok bg-ok-soft'}`}>
-                          <Icon icon={tampered ? 'lucide:shield-alert' : 'lucide:shield-check'} width="20" />
+                        <span className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${S.tile}`}>
+                          <Icon icon={S.icon} width="20" />
                         </span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <p className="text-base font-medium text-ink-hi break-all">
                               {c.file_name || '— unnamed file —'}
                             </p>
-                            <span className={tampered ? 'badge-alert' : 'badge-ok'}>
-                              {tampered ? 'Tampered' : 'Authentic'}
-                            </span>
+                            <span className={S.badge}>{S.label}</span>
                             {c.kind && <span className="badge-neutral">{c.kind}</span>}
                           </div>
 
@@ -482,7 +485,7 @@ export default function Dashboard({ navigate, onOpenResult }: DashboardProps) {
                           </div>
 
                           {/* The reason, not a score — same rationale as Results. */}
-                          {tampered && (c.reasons?.length ?? 0) > 0 && (
+                          {c.status !== 'authentic' && (c.reasons?.length ?? 0) > 0 && (
                             <p className="text-sm text-ink-lo">{c.reasons!.join(' · ')}</p>
                           )}
                         </div>

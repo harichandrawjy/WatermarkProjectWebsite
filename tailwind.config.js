@@ -96,6 +96,7 @@ export default {
         "glow-accent": "0 0 24px -6px rgba(34,211,238,0.45)",
         "glow-alert": "0 0 24px -6px rgba(244,63,94,0.45)",
         "glow-ok": "0 0 24px -6px rgba(52,211,153,0.45)",
+        "glow-warn": "0 0 24px -6px rgba(251,191,36,0.45)",
       },
 
       animation: {

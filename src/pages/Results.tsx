@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AnalysisResult, Page } from '../App'
+import type { AnalysisResult, Page, Verdict } from '../App'
 import { Icon } from '@iconify/react'
 
 interface ResultsProps {
@@ -7,8 +7,22 @@ interface ResultsProps {
   navigate: (p: Page) => void
 }
 
+type Tone = 'alert' | 'ok' | 'warn' | 'neutral'
+
 interface MetricProps {
-  label: string; value: string; sub?: string; tone?: 'alert' | 'ok' | 'neutral'
+  label: string; value: string; sub?: string; tone?: Tone
+}
+
+/** How each verdict looks. `unverifiable` is amber, not red: the watermark's
+ *  ids could not be read (a heavily re-compressed or resized copy, usually) but
+ *  nothing in the file shows an edit, so it is neither a pass nor an accusation. */
+const VERDICT: Record<Verdict, { label: string; tone: Tone; text: string; card: string; badge: string; icon: string; why: string }> = {
+  authentic:    { label: 'Authentic',    tone: 'ok',    text: 'text-ok',    icon: 'lucide:shield-check',
+                  card: 'bg-ok-soft border-ok-line shadow-glow-ok',          badge: 'border-ok-line text-ok',       why: '' },
+  tampered:     { label: 'Tampered',     tone: 'alert', text: 'text-alert', icon: 'lucide:shield-alert',
+                  card: 'bg-alert-soft border-alert-line shadow-glow-alert', badge: 'border-alert-line text-alert', why: 'Why this was flagged' },
+  unverifiable: { label: "Can't verify", tone: 'warn',  text: 'text-warn',  icon: 'lucide:shield-question',
+                  card: 'bg-warn-soft border-warn-line shadow-glow-warn',    badge: 'border-warn-line text-warn',   why: "Why this couldn't be verified" },
 }
 
 /** A single readout in the metrics strip.
@@ -18,7 +32,8 @@ interface MetricProps {
 function Metric({ label, value, sub, tone = 'neutral' }: MetricProps) {
   const valueTone =
     tone === 'alert' ? 'text-alert' :
-    tone === 'ok'    ? 'text-ok'    : 'text-ink-hi'
+    tone === 'ok'    ? 'text-ok'    :
+    tone === 'warn'  ? 'text-warn'  : 'text-ink-hi'
   return (
     <div className="px-5 py-5">
       <p className="label mb-2.5">{label}</p>
@@ -138,6 +153,7 @@ export default function Results({ result, navigate }: ResultsProps) {
           watermarkOriginal, watermarkExtracted, watermarkMask, watermarkClusters, sourcePreview,
           missingFrames, reordered, duplicateFrames, framesTruncated } = result
   const tampered = status === 'tampered'
+  const V = VERDICT[status] ?? VERDICT.tampered
 
   // If the backend didn't explicitly say, infer "found" from whether anything
   // was actually recovered from the pixels — NOT from the supplied metadata,
@@ -215,18 +231,14 @@ export default function Results({ result, navigate }: ResultsProps) {
           </div>
 
           {/* The one element on the page that earns a glow. */}
-          <div className={`flex items-center gap-5 px-7 py-5 rounded-2xl border lg:max-w-xl
-            ${tampered
-              ? 'bg-alert-soft border-alert-line shadow-glow-alert'
-              : 'bg-ok-soft border-ok-line shadow-glow-ok'}`}>
-            <span className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0
-              ${tampered ? 'border-alert-line text-alert' : 'border-ok-line text-ok'}`}>
-              <Icon icon={tampered ? 'lucide:shield-alert' : 'lucide:shield-check'} width="26" />
+          <div className={`flex items-center gap-5 px-7 py-5 rounded-2xl border lg:max-w-xl ${V.card}`}>
+            <span className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${V.badge}`}>
+              <Icon icon={V.icon} width="26" />
             </span>
             <div>
               <p className="label mb-1">Final verdict</p>
-              <p className={`font-display text-3xl leading-none mb-1.5 ${tampered ? 'text-alert' : 'text-ok'}`}>
-                {tampered ? 'Tampered' : 'Authentic'}
+              <p className={`font-display text-3xl leading-none mb-1.5 ${V.text}`}>
+                {V.label}
               </p>
               {/* The reason it was flagged, not a synthesised confidence
                   percentage. A tampered file can be pixel-clean (identity
@@ -234,9 +246,11 @@ export default function Results({ result, navigate }: ResultsProps) {
                   derived from cleanliness used to read "100% confidence"
                   on exactly the cases that most needed explaining. */}
               <p className="text-xs text-ink-lo">
-                {tampered
-                  ? (reasons?.length ? reasons[0] : 'integrity check failed')
-                  : 'all integrity checks passed'}
+                {status === 'authentic'
+                  ? 'all integrity checks passed'
+                  : reasons?.length
+                    ? reasons[0]
+                    : tampered ? 'integrity check failed' : 'the watermark could not be read'}
               </p>
             </div>
           </div>
@@ -269,25 +283,31 @@ export default function Results({ result, navigate }: ResultsProps) {
           so the verdict alone can't say whether the file was edited, re-encoded
           past recovery, or had frames removed. Listing the triggers is both
           truthful and more actionable than a percentage. */}
-      {tampered && (reasons?.length ?? 0) > 0 && (
-        <div className="card p-5 mb-6 border-alert-line bg-alert-soft">
-          <p className="label mb-3 text-alert">Why this was flagged</p>
+      {status !== 'authentic' && (reasons?.length ?? 0) > 0 && (
+        <div className={`card p-5 mb-6 ${tampered ? 'border-alert-line bg-alert-soft' : 'border-warn-line bg-warn-soft'}`}>
+          <p className={`label mb-3 ${V.text}`}>{V.why}</p>
           <ul className="flex flex-col gap-2">
             {reasons!.map((r, i) => (
               <li key={i} className="flex items-start gap-2.5 text-sm text-ink">
                 <Icon icon="lucide:alert-triangle" width="15"
-                      className="text-alert shrink-0 mt-0.5" />
+                      className={`${V.text} shrink-0 mt-0.5`} />
                 {r}
               </li>
             ))}
           </ul>
+          {status === 'unverifiable' && (
+            <p className="text-xs text-ink-lo mt-3">
+              This usually means a heavily compressed or resized copy. It is not a pass: to confirm the
+              file, verify the original or a less compressed copy.
+            </p>
+          )}
         </div>
       )}
 
       {/* ── Metrics ── */}
       <div className="card grid grid-cols-2 lg:grid-cols-5 divide-x divide-y lg:divide-y-0 divide-line mb-14 overflow-hidden">
-        <Metric label="Detection" value={tampered ? 'Tampered' : 'Authentic'}
-                sub="Watermark integrity check" tone={tampered ? 'alert' : 'ok'} />
+        <Metric label="Detection" value={V.label}
+                sub="Watermark integrity check" tone={V.tone} />
         <Metric label="WM accuracy" value={`${(wmAccuracy * 100).toFixed(1)}%`}
                 sub="Watermark bit recovery rate" />
         <Metric label="Bit error rate" value={ber.toFixed(4)}
@@ -369,12 +389,20 @@ export default function Results({ result, navigate }: ResultsProps) {
           ) : wmLocated ? (
             <div className="callout-warn">
               <Icon icon="lucide:alert-triangle" className="text-warn shrink-0 mt-0.5" width="16" />
-              <p>
-                The watermark was found after restoring this copy's original size, so the file
-                was protected with our Encode pipeline. Resizing and re-encoding then damaged too
-                many bits to read the owner and media IDs exactly. Verify the original file, or a
-                copy that was shared uncompressed (for example, sent as a document).
-              </p>
+              {resynced?.restored === false ? (
+                <p>
+                  The watermark was found, so the file was protected with our Encode pipeline, but
+                  compression damaged too many bits to read the owner and media IDs exactly. Verify
+                  the original file, or a less compressed copy (for example, one sent as a document).
+                </p>
+              ) : (
+                <p>
+                  The watermark was found after restoring this copy's original size, so the file
+                  was protected with our Encode pipeline. Resizing and re-encoding then damaged too
+                  many bits to read the owner and media IDs exactly. Verify the original file, or a
+                  copy that was shared uncompressed (for example, sent as a document).
+                </p>
+              )}
             </div>
           ) : (
             <div className="callout-alert">
@@ -445,6 +473,7 @@ export default function Results({ result, navigate }: ResultsProps) {
               {frameResults.map(f => {
                 const isDeleted = f.status === 'deleted'
                 const isT = f.status === 'tampered'
+                const isU = f.status === 'unverifiable'
                 const isActive = (activeFrame?.frame ?? frameResults[0]?.frame) === f.frame
                 return (
                   <button key={f.frame}
@@ -452,7 +481,7 @@ export default function Results({ result, navigate }: ResultsProps) {
                     onClick={() => setSelectedFrame(f.frame)}
                     title={isDeleted
                       ? `Frame ${f.frame}: DELETED — click to view its expected watermark`
-                      : `Frame ${f.frame}: ${f.status.toUpperCase()}${
+                      : `Frame ${f.frame}: ${isU ? "CAN'T VERIFY (IDs unreadable)" : f.status.toUpperCase()}${
                           f.blocksTotal ? ` — ${f.blocksTampered}/${f.blocksTotal} blocks flagged` : ''
                         } — click to view spatial map`}
                     className={`w-11 h-11 rounded-lg flex items-center justify-center font-mono text-xs
@@ -461,6 +490,8 @@ export default function Results({ result, navigate }: ResultsProps) {
                         ? 'bg-alert-soft text-alert border-dashed border-alert-line hover:bg-alert/20'
                         : isT
                         ? 'bg-alert-soft text-alert border-alert-line hover:bg-alert/20'
+                        : isU
+                        ? 'bg-warn-soft text-warn border-warn-line hover:bg-warn/20'
                         : 'bg-ok-soft text-ok border-ok-line hover:bg-ok/20'}
                       ${isActive ? 'ring-2 ring-accent ring-offset-2 ring-offset-surface' : ''}`}>
                     {isDeleted ? <Icon icon="lucide:trash-2" width="15" /> : f.frame}
@@ -474,7 +505,9 @@ export default function Results({ result, navigate }: ResultsProps) {
                 { cls: 'bg-ok-soft border-ok-line',                       text: 'Authentic frame' },
                 { cls: 'bg-alert-soft border-alert-line',                 text: 'Tampered frame' },
                 { cls: 'bg-alert-soft border-dashed border-alert-line',   text: 'Deleted frame' },
-              ].map(l => (
+                { cls: 'bg-warn-soft border-warn-line',                   text: "Can't verify (IDs unreadable)",
+                  only: frameResults.some(f => f.status === 'unverifiable') },
+              ].filter(l => l.only !== false).map(l => (
                 <span key={l.text} className="flex items-center gap-2 label">
                   <span className={`w-3 h-3 rounded border ${l.cls}`} /> {l.text}
                 </span>

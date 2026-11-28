@@ -41,7 +41,7 @@ const DETECT_ITEMS = [
 ]
 
 const REPORT_ITEMS = [
-  { icon: 'lucide:badge-check',    text: 'Authentic / tampered verdict, with the reason it was flagged' },
+  { icon: 'lucide:badge-check',    text: 'Authentic, tampered or can\'t-verify verdict, with the reason' },
   { icon: 'lucide:map-pin',        text: 'Exact spatial pixel regions that were altered' },
   { icon: 'lucide:film',           text: 'Per-frame timeline analysis for video files' },
   { icon: 'lucide:activity',       text: 'Visual sub-block parity mismatch heatmap' },

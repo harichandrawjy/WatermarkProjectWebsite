@@ -22,7 +22,7 @@ export interface TamperedRegion {
 
 export interface FrameResult {
   frame: number
-  status: 'tampered' | 'authentic' | 'deleted'
+  status: 'tampered' | 'authentic' | 'unverifiable' | 'deleted'
   /** Measured fragile-layer bit error rate for this frame. null on a deleted
    *  frame — there is nothing left to measure. */
   ber?: number | null
@@ -34,8 +34,13 @@ export interface FrameResult {
   watermarkExtracted?: string
 }
 
+/** `unverifiable`: the watermark's ids could not be read back, but nothing in
+ *  the file shows an edit either (typically a heavily re-compressed or resized
+ *  copy). Neither a pass nor evidence of tampering. */
+export type Verdict = 'tampered' | 'authentic' | 'unverifiable'
+
 export interface AnalysisResult {
-  status: 'tampered' | 'authentic'
+  status: Verdict
   /** Fraction of fragile-watermark parity bits recovered intact (1 - ber). */
   wmAccuracy: number
   /** Real bit error rate: fraction of parity bits that flipped. */
@@ -44,7 +49,7 @@ export interface AnalysisResult {
    *  Kept separate from `ber` because conflating the two is what made the old
    *  "Bit Error Rate" metric misleading. */
   blockFlagRatio?: number
-  /** Why the verdict was `tampered`, in plain language. Empty when authentic.
+  /** Why the verdict was `tampered` or `unverifiable`, in plain language. Empty when authentic.
    *  Replaces the old synthesised "confidence" score, which measured
    *  cleanliness and so inverted on a tampered verdict. */
   reasons?: string[]
@@ -56,7 +61,10 @@ export interface AnalysisResult {
   /** Set when the copy's size or crop had to be restored before it could be
    *  read. The backend only accepts a geometry the expected ids agree with, so
    *  this also means the watermark was located even if the ids then failed. */
-  resynced?: { width: number; height: number; offsetX: number; offsetY: number } | null
+  resynced?: { width: number; height: number; offsetX: number; offsetY: number;
+               /** False when the search settled on the copy's own size and position
+                *  (a compressed copy that was never resized or cropped). */
+               restored?: boolean } | null
   ownerMatch?: boolean
   mediaMatch?: boolean
   // Recovered: the raw strings actually extracted from the watermark. Present
